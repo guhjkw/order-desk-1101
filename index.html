@@ -1,0 +1,1288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Order Desk · working prototype</title>
+<meta name="description" content="Working prototype of an order-processing SaaS for German B2B companies: email, PDF and Excel orders read, checked against the company's own data, approved and sent to Business Central once. Invented sample data.">
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#eceff3;--panel:#fff;--line:#d5dae1;--line2:#e8ebef;--text:#1c2229;--muted:#5d6876;--faint:#8b95a1;
+  --accent:#0f6b74;--accent2:#0a565e;--accentbg:#e4f0f1;
+  --ok:#17713a;--okbg:#e5f3ea;--warn:#875600;--warnbg:#fcf0d4;--err:#b3232c;--errbg:#fbe6e7;--info:#2b5791;--infobg:#e6edf8;
+  --mark:#ffe680;--gold:#8a5d00;--goldbg:#fff5dc;--goldline:#e2c169;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+html,body{margin:0}
+body{font:13.5px/1.45 var(--sans);color:var(--text);background:var(--bg);display:flex;flex-direction:column;height:100vh;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--accent)}
+.mono{font-family:var(--mono);font-size:12.5px}
+.muted{color:var(--muted)}
+.r{text-align:right}
+td,th{font-variant-numeric:tabular-nums}
+[hidden]{display:none!important}
+
+/* demo strip + top bar */
+.demo{background:#20262e;color:#d9dee5;font-size:12.5px;padding:6px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.demo b{color:#fff;font-weight:600}
+.demo a{color:#9fd6dc;cursor:pointer;text-decoration:underline}
+.demo .sp{flex:1}
+.demo button{background:none;border:1px solid #4a5361;color:#d9dee5;border-radius:3px;padding:1px 8px;cursor:pointer;font-size:12px}
+.top{background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:18px;padding:0 16px;height:48px;flex:none}
+.brand{display:flex;align-items:center;gap:8px;font-weight:650;font-size:15px;letter-spacing:-.01em}
+.logo{width:24px;height:24px;border-radius:4px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;letter-spacing:.02em}
+.tenant{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}
+.tenant select{border:1px solid var(--line);border-radius:4px;padding:4px 6px;background:#fff;font-weight:600;color:var(--text);max-width:300px}
+.top .sp{flex:1}
+.today{color:var(--muted);font-size:12.5px}
+.user{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.avatar{width:26px;height:26px;border-radius:50%;background:#d7dde5;color:#38424e;font-size:11px;font-weight:700;display:inline-grid;place-items:center;flex:none}
+.avatar.sm{width:30px;height:30px;font-size:11.5px}
+
+/* shell */
+.shell{flex:1;min-height:0;display:flex}
+nav{width:196px;flex:none;background:#f7f8fa;border-right:1px solid var(--line);padding:10px 8px;overflow-y:auto;display:flex;flex-direction:column}
+nav .grp{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin:12px 8px 4px;font-weight:600}
+nav .grp:first-child{margin-top:2px}
+nav a{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:4px;color:var(--text);text-decoration:none;cursor:pointer}
+nav a:hover{background:#eceff3}
+nav a.on{background:var(--accentbg);color:var(--accent2);font-weight:600}
+nav .count{background:var(--err);color:#fff;border-radius:9px;font-size:10.5px;padding:0 6px;font-weight:600;line-height:17px}
+nav .count:empty{display:none}
+nav .credit{margin-top:auto;padding:12px 8px 4px;font-size:11px;color:var(--faint);line-height:1.4}
+main{flex:1;min-width:0;overflow:auto}
+.view{padding:18px 22px 40px}
+.view h1{font-size:19px;margin:0 0 4px;letter-spacing:-.01em}
+.view .lead{color:var(--muted);margin:0 0 16px;max-width:820px}
+h4{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:16px 0 6px;font-weight:650}
+
+/* buttons, pills */
+.btn{border:1px solid var(--line);background:#fff;border-radius:4px;padding:5px 11px;cursor:pointer;font-size:13px;line-height:1.3}
+.btn:hover{border-color:#b8c0ca;background:#f8f9fb}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn.primary:hover{background:var(--accent2)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.sm{padding:2px 8px;font-size:12px}
+.btn.ghost{border-color:transparent;background:none;color:var(--muted)}
+.link{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;text-decoration:underline;font-size:inherit}
+.pill{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:3px;white-space:nowrap}
+.pill.ready{background:var(--okbg);color:var(--ok)}
+.pill.review{background:var(--warnbg);color:var(--warn)}
+.pill.blocked{background:var(--errbg);color:var(--err)}
+.pill.sent{background:var(--infobg);color:var(--info)}
+.chip{display:inline-block;font-size:11px;padding:0 6px;border-radius:3px;background:#eef0f3;color:var(--muted);border:1px solid var(--line2)}
+.badge{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.04em;padding:0 4px;border-radius:2px;border:1px solid var(--line);color:var(--muted);background:#fff}
+
+/* inbox */
+#v-inbox{padding:0;height:100%;display:flex;flex-direction:column}
+.kpis{display:flex;flex-wrap:wrap;background:var(--panel);border-bottom:1px solid var(--line);flex:none}
+.kpi{padding:9px 18px;border-right:1px solid var(--line2);min-width:118px}
+.kpi .k{font-size:11px;color:var(--muted)}
+.kpi .v{font-size:18px;font-weight:650;font-variant-numeric:tabular-nums}
+.kpi.ok .v{color:var(--ok)}.kpi.warn .v{color:var(--warn)}.kpi.err .v{color:var(--err)}.kpi.info .v{color:var(--info)}
+.tip{background:#fffbea;border-bottom:1px solid #eedc9a;padding:8px 16px 8px 18px;font-size:13px;display:flex;gap:12px;align-items:flex-start;flex:none}
+.tip p{margin:0;flex:1}
+.tip a{cursor:pointer}
+.panes{flex:1;min-height:0;display:grid;grid-template-columns:272px minmax(0,1fr) minmax(390px,470px)}
+.pane{min-height:0;overflow:auto;background:var(--panel);border-right:1px solid var(--line)}
+.pane:last-child{border-right:0}
+.pane.doc{background:#f4f5f7}
+.pane-head{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:2}
+.pane-head b{font-size:13.5px}
+.pane-head .addr{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.filters{display:flex;gap:4px;padding:7px 10px;border-bottom:1px solid var(--line2);flex-wrap:wrap}
+.filters button{border:1px solid var(--line);background:#fff;border-radius:3px;font-size:11.5px;padding:1px 7px;cursor:pointer;color:var(--muted)}
+.filters button.on{background:var(--text);border-color:var(--text);color:#fff}
+#list{list-style:none;margin:0;padding:0}
+.li{padding:9px 12px 9px 14px;border-bottom:1px solid var(--line2);cursor:pointer;position:relative}
+.li:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+.li.st-ready:before{background:var(--ok)}.li.st-review:before{background:#d4a017}.li.st-blocked:before{background:var(--err)}.li.st-sent:before{background:var(--info)}
+.li:hover{background:#f7f9fb}
+.li.on{background:var(--accentbg)}
+.li-top{display:flex;gap:6px;align-items:center;font-size:11.5px;color:var(--muted)}
+.li-id{font-family:var(--mono);font-weight:700;color:var(--text);font-size:12px}
+.li-time{margin-left:auto}
+.li-who{font-weight:600;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li-subj{color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li-foot{margin-top:4px;font-size:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.li.empty{color:var(--muted);cursor:default;padding:18px 14px}
+.pane-foot{padding:10px 12px}
+
+/* original document */
+.doc-bar{display:flex;gap:10px;align-items:baseline;padding:9px 16px;border-bottom:1px solid var(--line);background:#fafbfc;position:sticky;top:0;z-index:2;flex-wrap:wrap}
+.doc-bar .hint{font-size:11.5px;color:var(--faint);margin-left:auto}
+.mail{margin:14px 16px 24px;background:#fff;border:1px solid var(--line);border-radius:4px}
+.mail-subj{font-size:15px;font-weight:650;padding:14px 18px 6px}
+.mail-meta{display:flex;gap:10px;padding:4px 18px 12px;border-bottom:1px solid var(--line2);font-size:12.5px}
+.mail-body{padding:12px 18px 16px;white-space:pre-wrap;word-break:break-word}
+.tl{min-height:1.45em;border-radius:2px}
+.hl{background:rgba(255,230,128,.55);box-shadow:0 0 0 2px var(--mark)}
+mark{background:var(--mark);color:inherit;padding:0 1px;border-radius:2px;box-shadow:0 0 0 1px #e6c200}
+.att{margin:0 18px 18px;border:1px solid var(--line);border-radius:4px;overflow-x:auto;background:#f2f3f5}
+.att-bar{display:flex;gap:8px;align-items:center;padding:6px 10px;background:#f2f3f5;border-bottom:1px solid var(--line);font-size:12px}
+.att-bar .muted{margin-left:auto}
+.paper{background:#fff;margin:10px;padding:16px 18px;min-width:430px;border:1px solid #cfd4db;font:11.5px/1.5 Arial,Helvetica,sans-serif;color:#111}
+.pl-co{font-weight:700;font-size:13.5px}
+.pl-title{font-weight:700;font-size:16px;letter-spacing:.08em;margin:14px 0 6px}
+.ptab{width:100%;border-collapse:collapse;margin:12px 0;font-size:11px}
+.ptab th,.ptab td{border:1px solid #9aa1aa;padding:3px 4px;text-align:left;white-space:nowrap}
+.ptab td:nth-child(3){white-space:normal}
+.ptab th{background:#eef0f2}
+.ptab td.r{text-align:right}
+.pf{font-size:11.5px;margin-top:4px}
+.sheet-wrap{overflow:auto;background:#fff}
+.sheet{border-collapse:collapse;font:12px/1.4 Calibri,Carlito,Arial,sans-serif;min-width:100%}
+.sheet th{background:#f3f3f3;color:#555;font-weight:400;border:1px solid #d4d4d4;padding:2px 6px;text-align:center;min-width:26px}
+.sheet td{border:1px solid #e1e1e1;padding:2px 8px;white-space:nowrap;min-width:56px;max-width:190px;overflow:hidden;text-overflow:ellipsis}
+.sheet td.r{text-align:right}
+.sheet .hl,.sheet tr.hl td{background:#e8f4ea;box-shadow:none}
+.sheet td.hl{outline:2px solid #217346;outline-offset:-2px;background:#e8f4ea}
+
+/* detail */
+.d-head{padding:12px 16px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;z-index:2}
+.d-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.d-id{font-family:var(--mono);font-size:15px;font-weight:700}
+.d-sub{color:var(--muted);font-size:12px;margin-top:2px}
+.d-body{padding:4px 16px 20px}
+.banner{margin:12px 0 0;padding:8px 10px;border-radius:4px;font-size:12.5px}
+.banner.info{background:var(--infobg);color:#1f416c}
+.banner.ok{background:var(--okbg);color:#14532d}
+.issues{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.issue{display:flex;gap:8px;align-items:flex-start;padding:7px 9px;border-radius:4px;border:1px solid;font-size:12.5px}
+.issue.error{background:var(--errbg);border-color:#f2c4c7}
+.issue.warning{background:var(--warnbg);border-color:#efd9a2}
+.issue.info{background:var(--infobg);border-color:#c9d7ee}
+.ico{width:16px;height:16px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:10.5px;font-weight:800;color:#fff;margin-top:1px}
+.issue.error .ico{background:var(--err)}.issue.warning .ico{background:#c98a00}.issue.info .ico{background:var(--info)}
+.issue .msg{flex:1;min-width:0}
+.fixes{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.fixes .btn{text-align:left}
+.fixes select,.inline-sel{font-size:12px;border:1px solid var(--line);border-radius:3px;padding:2px 4px;background:#fff;max-width:100%}
+table.kv{width:100%;border-collapse:collapse}
+.kv th{width:132px;text-align:left;font-weight:400;color:var(--muted);vertical-align:top;padding:5px 8px 5px 0;font-size:12.5px}
+.kv td{padding:5px 0;vertical-align:top}
+.kv tr[data-hl],.lines tr[data-hl]{cursor:pointer}
+.kv tr[data-hl]:hover td,.kv tr[data-hl]:hover th{background:#f6f8fa}
+.kv tr.on td,.kv tr.on th,.lines tr.on td{background:#fff8d6}
+.how{font-size:11.5px;color:var(--muted)}
+.bad{color:var(--err);font-weight:600}
+.edit{border:1px solid transparent;border-bottom:1px dashed #aab3be;background:transparent;padding:1px 3px;border-radius:2px;min-width:0;width:150px}
+.edit:hover{border-color:var(--line)}
+.edit:focus{outline:none;border:1px solid var(--accent);background:#fff}
+.edit.invalid{border:1px solid var(--err);background:var(--errbg)}
+.tbl{overflow-x:auto}
+table.lines{width:100%;border-collapse:collapse;font-size:12.5px}
+.lines th{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;text-align:left;border-bottom:1px solid var(--line);padding:5px 6px}
+.lines th.r{text-align:right}
+.lines td{padding:6px;border-bottom:1px solid var(--line2);vertical-align:top}
+.lines td.n{color:var(--faint);width:18px}
+.lines td.r{white-space:nowrap}
+.lines tr.sev-error td:first-child{box-shadow:inset 3px 0 var(--err)}
+.lines tr.sev-warning td:first-child{box-shadow:inset 3px 0 #d4a017}
+.lines tr.sub td{border-bottom:1px solid var(--line2);padding-top:0}
+.lines tfoot td{border:0;padding:3px 6px}
+.lines tfoot .gross td{font-weight:700;border-top:1px solid var(--line);padding-top:5px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--line2)}
+.fine{font-size:12px;color:var(--muted);margin:8px 0 0}
+.empty-state{padding:40px 24px;color:var(--muted);text-align:center}
+
+/* tables on other pages */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:4px;margin-bottom:16px}
+.card-h{padding:10px 14px;border-bottom:1px solid var(--line2);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.card-h b{font-size:13.5px}
+.card-b{padding:12px 14px}
+table.grid{width:100%;border-collapse:collapse;font-size:12.5px}
+.grid th{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;text-align:left;border-bottom:1px solid var(--line);padding:6px 8px;background:#fafbfc;white-space:nowrap}
+.grid td{padding:6px 8px;border-bottom:1px solid var(--line2);vertical-align:top}
+.grid th.r{text-align:right}
+.grid tr.click{cursor:pointer}
+.grid tr.click:hover td{background:#f6f8fa}
+.search{border:1px solid var(--line);border-radius:4px;padding:5px 8px;width:260px;max-width:100%}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px 14px}
+.form label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.form input,.form select{border:1px solid var(--line);border-radius:4px;padding:5px 7px;background:#fff;color:var(--text);font-size:13px}
+.form input.guid{font-family:var(--mono);font-size:12px}
+textarea.csv{width:100%;min-height:120px;border:1px solid var(--line);border-radius:4px;padding:8px;font:12px/1.45 var(--mono);resize:vertical}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.errors{background:var(--errbg);border:1px solid #f2c4c7;border-radius:4px;padding:8px 12px;margin:10px 0;color:#7c1a20}
+.errors ul,.warns ul{margin:4px 0 0;padding-left:18px}
+.warns{background:var(--warnbg);border:1px solid #efd9a2;border-radius:4px;padding:8px 12px;margin:10px 0;color:#5f3d00}
+.okline{color:var(--ok);font-weight:600}
+.map{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0;font-size:12px;color:var(--muted)}
+.map label{display:flex;flex-direction:column;gap:2px}
+.map select{border:1px solid var(--line);border-radius:3px;padding:2px 4px;font-size:12px;background:#fff}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.kvlist{display:grid;grid-template-columns:150px minmax(0,1fr);gap:6px 12px;font-size:13px}
+.kvlist div:nth-child(odd){color:var(--muted)}
+.hol{list-style:none;margin:0;padding:0;font-size:12.5px}
+.hol li{padding:3px 0;border-bottom:1px solid var(--line2);display:flex;gap:10px}
+.hol li span:first-child{width:118px;font-variant-numeric:tabular-nums;color:var(--muted)}
+details.logi{border:1px solid var(--line);border-radius:4px;margin-bottom:8px;background:#fff}
+details.logi summary{padding:8px 12px;cursor:pointer;font-size:13px}
+details.logi .inner{padding:4px 12px 12px}
+
+/* Business Central requests */
+.req{border:1px solid var(--line);border-radius:4px;margin-bottom:10px;background:#fff;overflow:hidden}
+.req-step{font-size:11.5px;color:var(--muted);padding:6px 10px 0}
+.req-line{padding:3px 10px 6px;font-family:var(--mono);font-size:11.5px;word-break:break-all}
+.meth{font-weight:700;padding:0 4px;border-radius:2px;font-size:10.5px}
+.meth.GET{background:#e6edf8;color:var(--info)}.meth.POST{background:#e5f3ea;color:var(--ok)}
+.req pre,.resp pre{margin:0;padding:8px 10px;background:#f7f8fa;border-top:1px solid var(--line2);font:11.5px/1.45 var(--mono);white-space:pre-wrap;word-break:break-all;max-height:220px;overflow:auto}
+.resp{border-top:1px solid var(--line2)}
+.resp .code{display:inline-block;margin:6px 10px 0;font:700 11px var(--mono);color:var(--ok)}
+.resp.skipped{padding:7px 10px;font-size:12px;color:var(--muted);background:#fafbfc}
+.result{padding:8px 10px;border-radius:4px;margin:0 0 12px;font-weight:600}
+.result.ok{background:var(--okbg);color:var(--ok)}
+.result.warn{background:var(--infobg);color:#1f416c}
+
+/* drawer, modal, toast */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(620px,100%);background:#f4f5f7;border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(20,30,40,.12);z-index:30;display:flex;flex-direction:column}
+.drawer-h{display:flex;align-items:center;gap:10px;padding:12px 16px;background:#fff;border-bottom:1px solid var(--line)}
+.drawer-h b{flex:1}
+.drawer-b{overflow:auto;padding:14px 16px 30px}
+.scrim{position:fixed;inset:0;background:rgba(20,28,38,.35);z-index:40;display:grid;place-items:center;padding:16px}
+.modal{background:#fff;border-radius:6px;width:min(640px,100%);max-height:calc(100vh - 32px);overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.22)}
+.modal-h{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.modal-h b{flex:1;font-size:14px}
+.modal-b{padding:14px 16px}
+.modal-b label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+.modal-b input,.modal-b textarea{width:100%;border:1px solid var(--line);border-radius:4px;padding:6px 8px;background:#fff}
+.modal-b textarea{min-height:190px;font:12.5px/1.5 var(--mono);resize:vertical}
+.modal-f{padding:10px 16px 14px;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;border-top:1px solid var(--line2)}
+.modal-f .sp{flex:1}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1f2730;color:#fff;padding:9px 16px;border-radius:4px;font-size:13px;z-index:50;max-width:calc(100% - 32px);box-shadow:0 6px 18px rgba(0,0,0,.25)}
+
+/* proposal */
+.prop{max-width:1040px}
+.qa{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin:10px 0 22px}
+.qa .card{margin:0}
+.qa .q{font-size:12px;color:var(--muted);padding:12px 14px 0}
+.qa .a{padding:4px 14px 14px}
+.qa .big{font-size:22px;font-weight:700;letter-spacing:-.01em;margin:2px 0 4px;font-variant-numeric:tabular-nums}
+.tiers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:10px 0 22px;align-items:start}
+.tier{background:#fff;border:1px solid var(--line);border-radius:5px;padding:16px}
+.tier.feat{border:2px solid var(--goldline);background:linear-gradient(#fffdf6,#fff)}
+.tier .tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gold);background:var(--goldbg);border:1px solid var(--goldline);border-radius:3px;padding:1px 6px;margin-bottom:6px}
+.tier h3{margin:0;font-size:15px}
+.tier .price{font-size:26px;font-weight:700;margin:6px 0 0;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.tier .per{font-size:12px;color:var(--muted)}
+.tier ul{padding-left:18px;margin:10px 0 0;font-size:13px}
+.tier li{margin:3px 0}
+.stack{margin-top:12px;border-top:1px dashed var(--goldline);padding-top:10px;font-size:12.5px}
+.stack div{display:flex;justify-content:space-between;gap:10px;padding:2px 0}
+.stack s{color:var(--faint)}
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:10px 0 22px}
+.step{background:#fff;border:1px solid var(--line);border-radius:4px;padding:12px}
+.step .n{font:700 12px var(--mono);color:var(--accent)}
+.step.theirs{border-color:var(--accent);background:var(--accentbg)}
+.tree{background:#1f2730;color:#d8dee6;border-radius:4px;padding:12px 14px;font:12px/1.6 var(--mono);white-space:pre;overflow-x:auto}
+.cta{background:var(--text);color:#fff;border-radius:6px;padding:20px 22px;margin:22px 0}
+.cta h2{margin:0 0 6px;font-size:18px}
+.cta p{margin:4px 0;color:#d5dbe3}
+.need{counter-reset:n;list-style:none;padding:0;margin:8px 0 22px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px}
+.need li{counter-increment:n;padding-left:28px;position:relative}
+.need li:before{content:counter(n);position:absolute;left:0;top:0;width:20px;height:20px;border-radius:50%;background:var(--accentbg);color:var(--accent2);font-weight:700;font-size:11.5px;display:grid;place-items:center}
+.sec{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px;margin:8px 0 22px;font-size:13px}
+.sec div{padding-left:14px;border-left:2px solid var(--accent)}
+.scope{font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px;margin-top:22px}
+.scope p{margin:4px 0}
+
+@media (prefers-reduced-motion:no-preference){.li,.btn,nav a{transition:background-color .12s,border-color .12s}}
+@media (max-width:1180px){.panes{grid-template-columns:240px minmax(0,1fr) minmax(350px,420px)}}
+@media (max-width:960px){
+  body{display:block;height:auto}
+  .shell{display:block}
+  .top{height:auto;padding:8px 16px;flex-wrap:wrap;gap:8px 14px}
+  .top .sp,.today{display:none}
+  nav{width:auto;flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:6px 8px;gap:2px}
+  nav .grp,nav .credit{display:none}
+  nav a{white-space:nowrap;flex:none}
+  main{overflow:visible}
+  #v-inbox{height:auto}
+  .panes{display:block}
+  .pane{border-right:0;border-bottom:1px solid var(--line);overflow:visible}
+  .pane.list #list{max-height:340px;overflow:auto}
+  .pane-head,.doc-bar,.d-head{position:static}
+  .view{padding:16px 16px 32px}
+  .tiers,.steps,.need,.sec,.two{grid-template-columns:1fr}
+  .kpi{min-width:0;flex:1 1 33%;padding:8px 12px}
+  .mail,.att{margin-left:10px;margin-right:10px}
+  .paper{padding:16px;margin:10px}
+  .kvlist{grid-template-columns:1fr}
+  .kvlist div:nth-child(odd){margin-top:6px}
+  .tip{padding:8px 16px}
+}
+</style>
+</head>
+<body>
+<div class="demo" id="demo">
+  <span><b>Working prototype</b> built for your Upwork post · invented companies and orders · Business Central requests are built, not sent</span>
+  <span class="sp"></span>
+  <a data-go="proposal">Proposal and prices</a>
+  <button type="button" data-act="reset-demo">Reset demo</button>
+</div>
+<header class="top">
+  <div class="brand"><span class="logo">OD</span>Order Desk</div>
+  <label class="tenant"><span>Company</span><select id="tenant" aria-label="Company"></select></label>
+  <span class="sp"></span>
+  <span class="today" id="today"></span>
+  <span class="user" id="user"></span>
+</header>
+<div class="shell">
+  <nav id="nav" aria-label="Main">
+    <div class="grp">Work</div>
+    <a data-go="inbox">Inbox <span class="count" id="nav-n"></span></a>
+    <a data-go="orders">Orders</a>
+    <div class="grp">Master data</div>
+    <a data-go="products">Products</a>
+    <a data-go="customers">Customers</a>
+    <div class="grp">Admin</div>
+    <a data-go="rules">Rules</a>
+    <a data-go="bc">Business Central</a>
+    <a data-go="setup">Add a company</a>
+    <div class="grp">For you</div>
+    <a data-go="costs">Running costs</a>
+    <a data-go="proposal">Proposal and prices</a>
+    <div class="credit">Built by Taiwo, Pathfinder Automation Solutions. All data on these pages is invented.</div>
+  </nav>
+  <main id="main">
+    <section class="view" id="v-inbox">
+      <div class="kpis" id="kpis"></div>
+      <div class="tip" id="tip"></div>
+      <div class="panes">
+        <div class="pane list">
+          <div class="pane-head"><b>Inbox</b><span class="addr" id="addr"></span><button class="btn sm" type="button" data-act="paste-open">New order</button></div>
+          <div class="filters" id="filters"></div>
+          <ul id="list"></ul>
+          <div class="pane-foot"><button class="btn" type="button" id="send-all" data-act="send-all">Send all ready</button></div>
+        </div>
+        <div class="pane doc" id="doc"></div>
+        <div class="pane detail" id="detail"></div>
+      </div>
+    </section>
+
+    <section class="view" id="v-orders" hidden>
+      <h1>Orders</h1>
+      <p class="lead">Every order that arrived today for this company, with what happened to it. Click one to open it in the inbox.</p>
+      <div class="card"><div class="tbl"><table class="grid" id="orders-tbl"></table></div></div>
+    </section>
+
+    <section class="view" id="v-products" hidden>
+      <h1>Products</h1>
+      <p class="lead" id="prod-lead"></p>
+      <div class="card"><div class="card-h"><input class="search" id="prod-q" type="search" placeholder="Search article number, description or EAN" aria-label="Search products"><span class="muted" id="prod-n"></span></div>
+      <div class="tbl"><table class="grid"><thead><tr><th>Article</th><th>Description</th><th>Unit</th><th>Packs</th><th class="r">List price</th><th>EAN</th><th>Notes</th></tr></thead><tbody id="prod-body"></tbody></table></div></div>
+    </section>
+
+    <section class="view" id="v-customers" hidden>
+      <h1>Customers</h1>
+      <p class="lead">Who may order, how an order is recognised as theirs (sender domain, customer number or VAT ID), and their agreed prices.</p>
+      <div class="card"><div class="tbl"><table class="grid" id="cust-tbl"></table></div></div>
+    </section>
+
+    <section class="view" id="v-rules" hidden>
+      <h1>Rules</h1>
+      <p class="lead" id="rules-lead"></p>
+      <div class="two">
+        <div>
+          <div class="card"><div class="card-h"><b>Checks</b><span class="muted">changes apply to the inbox at once</span></div>
+            <div class="card-b">
+              <div class="form">
+                <label>Federal state (public holidays)<select id="r-state"></select></label>
+                <label>Price tolerance, %<input id="r-tol" type="number" min="0" max="50" step="0.5"></label>
+                <label>Auto-send when confidence is at least, %<input id="r-auto" type="number" min="50" max="100" step="1"></label>
+                <label>Duplicate window, days<input id="r-win" type="number" min="1" max="90" step="1"></label>
+              </div>
+              <label class="row" style="margin-top:12px"><input type="checkbox" id="r-autosend"> Send clean orders to Business Central automatically</label>
+              <div id="r-err"></div>
+              <div id="r-effect" class="banner ok" hidden></div>
+            </div>
+          </div>
+        </div>
+        <div class="card"><div class="card-h"><b>Public holidays ahead</b><span class="muted" id="hol-state"></span></div><div class="card-b"><ul class="hol" id="hol"></ul></div></div>
+      </div>
+    </section>
+
+    <section class="view" id="v-bc" hidden>
+      <h1>Business Central</h1>
+      <p class="lead">How approved orders reach Microsoft Dynamics 365 Business Central. In this prototype every request is built exactly as the API v2.0 expects and answered by a simulated sandbox, so nothing leaves the page.</p>
+      <div class="two">
+        <div class="card"><div class="card-h"><b>Connection</b></div><div class="card-b"><div class="kvlist" id="bc-conn"></div></div></div>
+        <div class="card"><div class="card-h"><b>How it avoids double orders</b></div><div class="card-b" style="font-size:13px">
+          <p style="margin:0 0 6px">1. Before sending, the inbox compares the order with every order already seen for that customer (same order number, or the same lines within the duplicate window).</p>
+          <p style="margin:0 0 6px">2. Before creating, it asks Business Central for a sales order with the same external document number. If one exists, nothing is created.</p>
+          <p style="margin:0">3. Header first, then one request per line, so a failed line can be retried on its own.</p>
+        </div></div>
+      </div>
+      <div class="card"><div class="card-h"><b>Sales orders in Business Central</b><span class="muted">(simulated sandbox)</span></div><div class="tbl"><table class="grid" id="bc-orders"></table></div></div>
+      <h4>Request log</h4>
+      <div id="bc-log"></div>
+    </section>
+
+    <section class="view" id="v-setup" hidden>
+      <h1>Add a company</h1>
+      <p class="lead">How you onboard a new subscriber without programming: their product list, their customers, their rules and their Business Central. <button class="link" type="button" data-act="su-example">Fill in an example company</button></p>
+      <div class="card"><div class="card-h"><b>1. Company</b></div><div class="card-b"><div class="form">
+        <label>Company name<input id="su-name" data-su="name" autocomplete="off"></label>
+        <label>City<input id="su-city" data-su="city" autocomplete="off"></label>
+        <label>Federal state<select id="su-state" data-su="state"></select></label>
+        <label>Name of the person who approves orders<input id="su-user" data-su="user" autocomplete="off"></label>
+      </div></div></div>
+      <div class="card"><div class="card-h"><b>2. Product list</b><span class="muted">paste a CSV export from their ERP, or upload the file</span></div><div class="card-b">
+        <textarea class="csv" id="su-prod" data-su="prod" spellcheck="false" placeholder="Art.-Nr.;Bezeichnung;ME;VK-Preis&#10;100-820;Sechskantschraube M8x20;Stk;0,12"></textarea>
+        <div class="row" style="margin-top:6px"><input type="file" id="su-prod-file" accept=".csv,.txt" aria-label="Upload product list"></div>
+        <div id="su-prod-out"></div>
+      </div></div>
+      <div class="card"><div class="card-h"><b>3. Customers</b><span class="muted">number and name required; e-mail, VAT ID and discount help recognise and price orders</span></div><div class="card-b">
+        <textarea class="csv" id="su-cust" data-su="cust" spellcheck="false" placeholder="Kunden-Nr.;Firma;E-Mail;USt-IdNr.;Rabatt %&#10;20001;Elektro Schröder GmbH;einkauf@schroeder-elektro.de;DE811234567;3"></textarea>
+        <div class="row" style="margin-top:6px"><input type="file" id="su-cust-file" accept=".csv,.txt" aria-label="Upload customer list"></div>
+        <div id="su-cust-out"></div>
+      </div></div>
+      <div class="card"><div class="card-h"><b>4. Rules and Business Central</b></div><div class="card-b"><div class="form">
+        <label>Price tolerance, %<input id="su-tol" data-su="tol" type="number" min="0" max="50" step="0.5"></label>
+        <label>Auto-send confidence, %<input id="su-auto" data-su="auto" type="number" min="50" max="100"></label>
+        <label>Duplicate window, days<input id="su-win" data-su="win" type="number" min="1" max="90"></label>
+        <label>Business Central tenant ID<input id="su-bct" data-su="bct" class="guid" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off"></label>
+        <label>Environment<input id="su-bce" data-su="bce" autocomplete="off"></label>
+        <label>Company ID<input id="su-bcc" data-su="bcc" class="guid" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off"></label>
+      </div>
+      <p class="fine">In the product the person signs in with Microsoft once, then picks the environment and company from a list, so nobody types an ID.</p>
+      </div></div>
+      <div id="su-msg"></div>
+      <div class="row"><button class="btn primary" type="button" data-act="su-create">Create company</button><span class="muted">It appears in the company switcher with its own empty inbox.</span></div>
+    </section>
+
+    <section class="view" id="v-costs" hidden>
+      <h1>Running costs</h1>
+      <p class="lead">What the platform costs to run each month, before your own subscription price. Change the numbers. Prices in US dollars because the providers bill in dollars.</p>
+      <div class="two">
+        <div class="card"><div class="card-h"><b>Your volume</b></div><div class="card-b"><div class="form">
+          <label>Orders per month, all companies<input id="c-orders" type="number" min="1" step="100"></label>
+          <label>Pages per order (average)<input id="c-pages" type="number" min="1" step="1"></label>
+          <label>Customer companies<input id="c-comp" type="number" min="1" step="1"></label>
+          <label>Reading model<select id="c-model"></select></label>
+        </div><div id="c-err"></div></div></div>
+        <div class="card"><div class="card-h"><b>Per month</b></div><div class="card-b" id="c-out"></div></div>
+      </div>
+      <div class="card"><div class="card-h"><b>Maintenance (optional)</b><span class="muted">Automation Care, month to month</span></div><div class="tbl"><table class="grid" id="care"></table></div></div>
+    </section>
+
+    <section class="view prop" id="v-proposal" hidden></section>
+  </main>
+</div>
+
+<div class="drawer" id="drawer" hidden role="dialog" aria-modal="false" aria-label="Business Central requests">
+  <div class="drawer-h"><b id="drawer-t">Business Central</b><button class="btn sm" type="button" data-act="drawer-close">Close</button></div>
+  <div class="drawer-b" id="drawer-b"></div>
+</div>
+<div class="scrim" id="scrim" hidden><div class="modal" role="dialog" aria-modal="true" id="modal"></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="src/orderEngine.js"></script>
+<script>
+(function () {
+  'use strict';
+  var E = window.OrderEngine;
+  var FALLBACK = {"_note":"Invented sample data: both companies, all customers, people, article numbers, VAT IDs and orders are made up for this demo.","today":"2026-11-02","pricing":{"rate":35,"mvp":[{"name":"Foundation and order intake","hours":46,"done":"Each company has its own login, data and inbound address (orders@yourbrand); emails, PDFs and Excel files arrive and are stored in the EU."},{"name":"Reading and checking orders","hours":44,"done":"Your 50 sample orders are read into structured fields and checked against the product list, customer list, units, prices, dates and duplicates."},{"name":"Review screen and Business Central","hours":64,"done":"Staff fix and approve orders on one screen; an approved order appears as a sales order with its lines in your Business Central sandbox, and never twice."},{"name":"Pilot and handover","hours":26,"done":"One real company runs live for a week; you get the source code, the accounts in your name and a guide for onboarding the next customer."}],"full":[{"name":"Self-serve onboarding and billing","hours":56,"done":"You add a new customer company in minutes: import their products and customers, connect their Business Central, start their subscription (Stripe, German VAT invoices)."},{"name":"Security and data protection","hours":50,"done":"Microsoft sign-in (Entra ID), roles, an audit log of every change, per-company encryption, retention and deletion rules, and the AV contract (Art. 28 GDPR) and TOMs ready for your customers."},{"name":"Scale and reliability","hours":58,"done":"Queues and retries, alerts when anything fails, scanned PDFs and faxes read, and a load test with 10,000 orders a month."},{"name":"Learning loop and admin console","hours":52,"done":"Every correction teaches the system that customer's article numbers and habits; you see usage, errors and revenue per company in one admin screen."}]},"costs":{"models":{"haiku":{"name":"Claude Haiku 5.5","in":0.1,"out":0.5},"sonnet":{"name":"Claude Sonnet 5.5","in":2.0,"out":10.0}},"tokensPerPage":1500,"baseTokens":2500,"outTokens":1000,"hostingBase":60,"hostingPerCompany":8,"email":15,"monitoring":10},"tenants":[{"id":"brandt","name":"Brandt Industriebedarf GmbH","city":"Bielefeld","state":"NW","inbox":"auftrag@brandt-industriebedarf.de","user":"Anna Weber","vat":0.19,"settings":{"priceTolerancePct":2,"autoApproveMin":0.95,"duplicateWindowDays":14},"bc":{"tenantId":"7c1f4a2e-5b8d-4e1f-9a63-2d0b8e4c71a5","environment":"Production","companyId":"a3e9d1b4-0c27-4f6e-8d55-91b7c2e0f418"},"items":[{"no":"100-820","desc":"Sechskantschraube DIN 933 M8x20 verzinkt","unit":"STK","pack":{"KAR":100},"price":0.12,"ean":"4012345008201"},{"no":"100-830","desc":"Sechskantschraube DIN 933 M8x30 verzinkt","unit":"STK","pack":{"KAR":100},"price":0.14},{"no":"100-1040","desc":"Sechskantschraube DIN 933 M10x40 verzinkt","unit":"STK","pack":{"KAR":100},"price":0.22},{"no":"200-008","desc":"Sechskantmutter DIN 934 M8 verzinkt","unit":"STK","pack":{"KAR":200},"price":0.04},{"no":"200-010","desc":"Sechskantmutter DIN 934 M10 verzinkt","unit":"STK","pack":{"KAR":200},"price":0.06},{"no":"300-008","desc":"Unterlegscheibe DIN 125 M8 verzinkt","unit":"STK","pack":{"KAR":500},"price":0.02},{"no":"410-650","desc":"Kabelbinder 4,8 x 200 mm schwarz (VE = 100 Stück)","unit":"VE","pack":{},"price":3.9},{"no":"520-006","desc":"Spiralbohrer HSS 6,0 mm","unit":"STK","pack":{},"price":2.8},{"no":"520-008","desc":"Spiralbohrer HSS 8,0 mm","unit":"STK","pack":{},"price":3.4},{"no":"610-009","desc":"Arbeitshandschuhe Nitril Größe 9","unit":"PAAR","pack":{"KAR":12},"price":2.1},{"no":"710-500","desc":"Montagekleber 290 ml Kartusche","unit":"STK","pack":{},"price":6.5,"moq":12},{"no":"720-300","desc":"PTFE-Dichtband 12 mm x 12 m","unit":"STK","pack":{},"price":0.95,"discontinued":true,"replacement":"720-310"},{"no":"720-310","desc":"PTFE-Dichtband 12 mm x 12 m (Nachfolger)","unit":"STK","pack":{},"price":0.98}],"customers":[{"no":"K-10001","name":"Meier Metallbau GmbH","city":"Gütersloh","vat":"DE123456789","domains":["meier-metallbau.de"],"discount":5,"contact":"Frau Meier","shipTo":{"name":"Meier Metallbau GmbH","line1":"Industriestraße 12","postCode":"33330","city":"Gütersloh","country":"DE"},"xref":{"MM-SR820":"100-820","MM-M8":"200-008"}},{"no":"K-10002","name":"Schulte Anlagenbau KG","city":"Paderborn","vat":"DE234567891","domains":["schulte-anlagenbau.de"],"discount":0,"contact":"Herr Schulte","prices":{"100-1040":0.19},"shipTo":{"name":"Schulte Anlagenbau KG","line1":"Am Hoppenhof 22","postCode":"33104","city":"Paderborn","country":"DE"}},{"no":"K-10003","name":"Holtkamp Haustechnik GmbH","city":"Herford","vat":"DE345678912","domains":["holtkamp-haustechnik.de"],"discount":3,"contact":"Herr Holtkamp","shipTo":{"name":"Holtkamp Haustechnik GmbH","line1":"Werrestraße 7","postCode":"32049","city":"Herford","country":"DE"}},{"no":"K-10004","name":"Wessel Montage GmbH","city":"Detmold","vat":"DE456789123","domains":["wessel-montage.de"],"discount":0,"contact":"Herr Wessel","shipTo":{"name":"Wessel Montage GmbH","line1":"Gutenbergstraße 30","postCode":"32756","city":"Detmold","country":"DE"}},{"no":"K-10005","name":"Kruse Maschinenbau GmbH","city":"Minden","vat":"DE567891234","domains":["kruse-maschinenbau.de"],"discount":8,"contact":"Frau Kruse","shipTo":{"name":"Kruse Maschinenbau GmbH","line1":"Hafenstraße 3","postCode":"32423","city":"Minden","country":"DE"}}],"history":[{"id":"SO-104817","customer":"K-10001","po":"4500011987","date":"2026-10-20","lines":[["100-820",1000],["200-008",1000]]}],"docs":[{"id":"M-1041","type":"email","from":"Jana Meier <einkauf@meier-metallbau.de>","subject":"Bestellung 4500012345","received":"2026-11-02 08:14","body":["Sehr geehrte Damen und Herren,","","hiermit bestellen wir zu den bekannten Konditionen:","","20 KAR 100-820 Sechskantschraube M8x20","10 KAR 200-008 Sechskantmutter M8","5 VE 410-650 Kabelbinder 200 mm","","Liefertermin: KW 46","Lieferadresse wie gehabt.","","Mit freundlichen Grüßen","Jana Meier","Einkauf, Meier Metallbau GmbH"]},{"id":"M-1042","type":"pdf","from":"Thomas Schulte <bestellung@schulte-anlagenbau.de>","subject":"Bestellung 4711-3381","received":"2026-11-02 08:31","filename":"Bestellung_4711-3381.pdf","body":["Anbei unsere Bestellung.","Gruß, T. Schulte"],"page":{"lines":["Schulte Anlagenbau KG","Am Hoppenhof 22 · 33104 Paderborn","An: Brandt Industriebedarf GmbH, Auftragsannahme","BESTELLUNG","Bestell-Nr.: 4711-3381","Datum: 30.10.2026","Kunden-Nr. bei Ihnen: K-10002","Liefertermin: 25.12.2026"],"table":{"head":["Pos.","Artikel-Nr.","Bezeichnung","Menge","ME","Einzelpreis €","Gesamt €"],"rows":[["1","100-1040","Sechskantschraube M10x40","2.000","Stk","0,19","380,00"],["2","200-010","Sechskantmutter M10","2.000","Stk","0,06","120,00"],["3","520-008","Spiralbohrer HSS 8,0 mm","10","Stk","3,10","31,00"]]},"footer":["Gesamtsumme netto: 531,00 €","Zahlungsziel 30 Tage netto · USt-IdNr. DE234567891","Bitte Bestellnummer auf allen Lieferpapieren angeben."]}},{"id":"M-1043","type":"excel","from":"Kai Holtkamp <einkauf@holtkamp-haustechnik.de>","subject":"Bestellung HT-2026-118","received":"2026-11-02 08:52","filename":"Bestellung_HT-2026-118.xlsx","body":["Hallo zusammen,","anbei unsere Bestellung als Excel.","Gruß, Kai Holtkamp"],"sheet":[["Bestellung","","",""],["Holtkamp Haustechnik GmbH","","",""],["Bestellnr.: HT-2026-118","","Datum: 01.11.2026",""],["","","",""],["Artikel","Bezeichnung","Anzahl","Einheit"],["300-008","Scheibe M8","1000","Stk"],["720-300","PTFE Band 12mm","50","Stk"],["710-500","Montagekleber Kartusche","6","Stk"],["610-009","Handschuhe Nitril 9","2","Karton"]]},{"id":"M-1044","type":"email","from":"Peter Wessel <p.wessel@wessel-montage.de>","subject":"Bestellung","received":"2026-11-02 09:05","body":["Guten Morgen,","bitte liefern Sie bis 06.11.2026:","","- 50 KAR 100-280 Schrauben M8x20","- Mutter M8 200 Stück","- 12 Stk Spiralbohrer HSS 6,0","","Unsere Bestellnummer: WM-5521","","Danke und Gruß","Peter Wessel"]},{"id":"M-1045","type":"email","from":"Jana Meier <einkauf@meier-metallbau.de>","subject":"WG: Bestellung 4500012345","received":"2026-11-02 09:12","body":["Hallo, zur Sicherheit noch einmal:","","----- Weitergeleitete Nachricht -----","Betreff: Bestellung 4500012345","","20 KAR 100-820 Sechskantschraube M8x20","10 KAR 200-008 Sechskantmutter M8","5 VE 410-650 Kabelbinder 200 mm","","Liefertermin: KW 46","","Mit freundlichen Grüßen","Jana Meier"]},{"id":"M-1046","type":"pdf","from":"Roth Werkstatt <info@roth-werkstatt.de>","subject":"Bestellung R-2026-031","received":"2026-11-02 09:40","filename":"R-2026-031.pdf","body":["Sehr geehrte Damen und Herren,","bitte bestätigen Sie die anliegende Bestellung.","M. Roth"],"page":{"lines":["Roth Werkstatt e.K.","Lindenweg 4 · 32756 Detmold","An: Brandt Industriebedarf GmbH","BESTELLUNG","Bestell-Nr.: R-2026-031","Datum: 31.10.2026","Liefertermin: 07.11.2026"],"table":{"head":["Pos.","Artikel-Nr.","Bezeichnung","Menge","ME","Einzelpreis €","Gesamt €"],"rows":[["1","100-830","Sechskantschraube M8x30","500","Stk","",""],["2","300-008","Unterlegscheibe M8","500","Stk","",""]]},"footer":["Roth Werkstatt e.K. · USt-IdNr. DE298765431"]}},{"id":"M-1047","type":"email","from":"Jana Meier <einkauf@meier-metallbau.de>","subject":"Nachbestellung 4500012399","received":"2026-11-02 10:03","body":["Hallo Frau Weber,","bitte wie folgt liefern:","","MM-SR820 x 30 Karton","MM-M8 x 15 Karton","","Wunschtermin: 13.11.2026","","Danke, J. Meier"]}]},{"id":"hofmann","name":"Hofmann Getränke & Feinkost GmbH","city":"Augsburg","state":"BY","inbox":"bestellung@hofmann-feinkost.de","user":"Lukas Bauer","vat":0.19,"settings":{"priceTolerancePct":1,"autoApproveMin":0.95,"duplicateWindowDays":7},"bc":{"tenantId":"e2b8c6d0-9f14-4a3b-b7e2-5c0d9a1f6e33","environment":"Production","companyId":"1f6d0b9e-7a42-4c85-9e31-b4a7c2d5e086"},"items":[{"no":"G-1001","desc":"Mineralwasser still 0,75 l Glas","unit":"FL","pack":{"KI":12},"price":0.69,"ean":"4006040000123"},{"no":"G-1002","desc":"Mineralwasser medium 0,75 l Glas","unit":"FL","pack":{"KI":12},"price":0.69,"ean":"4006040000130"},{"no":"G-2010","desc":"Apfelschorle 0,33 l Glas","unit":"FL","pack":{"KI":24},"price":0.58,"ean":"4006040000208"},{"no":"F-3100","desc":"Bergkäse 12 Monate gereift","unit":"KG","pack":{},"price":18.9},{"no":"F-3200","desc":"Schwarzwälder Schinken 500 g","unit":"STK","pack":{},"price":7.4},{"no":"F-4100","desc":"Olivenöl nativ extra 5 l Kanister","unit":"STK","pack":{},"price":42.0,"moq":2}],"customers":[{"no":"D-2001","name":"Hotel Zum Goldenen Hirsch GmbH","city":"Augsburg","vat":"DE612345678","domains":["goldener-hirsch-augsburg.de"],"discount":4,"contact":"Herr Huber","shipTo":{"name":"Hotel Zum Goldenen Hirsch","line1":"Maximilianstraße 40","postCode":"86150","city":"Augsburg","country":"DE"}},{"no":"D-2002","name":"Brauhaus am Dom GmbH","city":"Augsburg","vat":"DE623456789","domains":["brauhaus-am-dom.de"],"discount":0,"contact":"Frau Lechner","shipTo":{"name":"Brauhaus am Dom","line1":"Domplatz 2","postCode":"86152","city":"Augsburg","country":"DE"}},{"no":"D-2003","name":"Café Maximilian","city":"Augsburg","vat":"DE634567891","domains":["cafe-maximilian.de"],"discount":0,"contact":"Frau Steiner","shipTo":{"name":"Café Maximilian","line1":"Ludwigstraße 9","postCode":"86152","city":"Augsburg","country":"DE"}}],"history":[],"docs":[{"id":"H-201","type":"email","from":"Georg Huber <einkauf@goldener-hirsch-augsburg.de>","subject":"Bestellung Nr. 88412","received":"2026-11-02 07:48","body":["Grüß Gott,","bitte liefern Sie am Freitag, 06.11.2026:","","4006040000123 20 Kisten","4006040000208 10 Kisten","Bergkäse 12 Monate 3 kg","","Vielen Dank","Georg Huber, Hotel Zum Goldenen Hirsch"]},{"id":"H-202","type":"excel","from":"Maria Lechner <m.lechner@brauhaus-am-dom.de>","subject":"Wochenbestellung BH-11-07","received":"2026-11-02 08:20","filename":"Bestellung_KW45.xlsx","body":["Servus, Bestellung anbei.","Maria Lechner"],"sheet":[["Bestellnummer: BH-11-07","","Lieferdatum: 03.11.2026","",""],["","","","",""],["Artikelnummer","Artikel","Menge","ME","Preis"],["G-1002","Wasser medium","30","Kiste","8,28"],["F-4100","Olivenöl 5 l","1","Stück","42,00"]]},{"id":"H-203","type":"email","from":"Café Maximilian <info@cafe-maximilian.de>","subject":"Bestellung","received":"2026-11-02 09:15","body":["Hallo,","wir brauchen:","6 Kisten G-2010 Apfelschorle","","Liefertermin: 30.10.2026","","Liebe Grüße","Sabine Steiner"]}]}],"examples":{"_note":"Used by the Add a company page and the New order box. Invented, like everything else here.","company":{"name":"Nordlicht Elektrogroßhandel GmbH","city":"Hannover","state":"NI","user":"Jonas Wolff","priceTolerancePct":3,"autoApprovePct":95,"duplicateWindowDays":14,"bcTenantId":"4d2c8e1a-7b39-4f05-a6d2-0c9e5b7f13a8","bcEnvironment":"Production","bcCompanyId":"b81f3c6d-2e47-4a90-9c15-6e0d7a2b4f39"},"products":"Art.-Nr.;Bezeichnung;ME;VK-Preis;EK-Preis\nNL-1015;Mantelleitung NYM-J 3x1,5 mm²;m;0,89;0,52\nNL-1025;Mantelleitung NYM-J 3x2,5 mm²;m;1,35;0,81\nNL-2016;Leitungsschutzschalter B16 1-polig;Stk;2,40;1,10\nNL-2040;FI-Schutzschalter 40A 30mA 4-polig;Stk;28,90;17,50\nNL-3001;Schuko-Steckdose UP reinweiß;Stk;3,20;1,60\nNL-3002;Wippschalter Aus/Wechsel UP reinweiß;Stk;3,60;1,80\nNL-4100;Kabelkanal 40x60 mm, Länge 2 m;Stk;4,90;2,70\nNL-5010;Isolierband 15 mm x 10 m schwarz;Rolle;0,79;0,30\nNL-5020;Verbindungsklemme 3-polig (VE 50);VE;14,50;8,20\n;Abdeckrahmen 1-fach reinweiß;Stk;0,95;0,40\nNL-6000;Installationsdose UP 68 mm;Stk;auf Anfrage;0,12","customers":"Kunden-Nr.;Firma;E-Mail;USt-IdNr.;Rabatt %;Ort\n20001;Elektro Schröder GmbH;einkauf@schroeder-elektro.de;DE 811 234 567;3;Hannover\n20002;Lichttechnik Brandes KG;bestellung@brandes-licht.de;DE298877665;5;Hildesheim\n20003;Haustechnik Ahrens GmbH;info@ahrens-haustechnik.de;DE12345;0;Celle\n20004;Elektro Bäcker e.K.;baecker-elektro.de;;zehn;Peine\n20005;;kontakt@ohne-namen.de;;;Laatzen","orders":{"brandt":{"from":"Stefan Kruse <einkauf@kruse-maschinenbau.de>","subject":"Bestellung KM-77120","body":"Guten Tag Frau Weber,\n\nbitte liefern Sie bis 20.11.2026:\n\n4 KAR 100-1040 Sechskantschraube M10x40\n8 KAR 200-010 Sechskantmutter M10\n24 Paar 610-009 Arbeitshandschuhe Gr. 9\n2 Pal 410-650 Kabelbinder\n\nMit freundlichen Grüßen\nStefan Kruse\nKruse Maschinenbau GmbH"},"hofmann":{"from":"Maria Lechner <m.lechner@brauhaus-am-dom.de>","subject":"Bestellung BH-11-09","body":"Servus Herr Bauer,\n\nLieferung am Freitag, 13.11.2026:\n\n10 Kisten G-2010 Apfelschorle\n2 Stk F-4100 Olivenöl\n5 kg Bergkäse\n\nPfiat di\nMaria Lechner"}}}};
+  var TESTS = '65 node checks passed, 0 failed';
+  var D = null, T = {}, TIDS = [], S = null, HLS = [], guidN = 0;
+  var LABEL = { ready: 'Ready', review: 'Needs review', blocked: 'Blocked', sent: 'Sent' };
+  var VIEWS = ['inbox', 'orders', 'products', 'customers', 'rules', 'bc', 'setup', 'costs', 'proposal'];
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function clone(x) { return JSON.parse(JSON.stringify(x)); }
+  function eur(x) { return E.fmtMoney(x); }
+  function price(x) {
+    var d = Math.abs(x * 100 - Math.round(x * 100)) < 1e-7 ? 2 : Math.abs(x * 1000 - Math.round(x * 1000)) < 1e-7 ? 3 : 4;
+    return E.fmtNum(x, d) + ' €';
+  }
+  function usd(x, dec) { dec = dec === undefined ? 2 : dec; return '$' + Number(x).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
+  function pct(x) { return Math.round(x * 100) + '%'; }
+  function dateLong(iso) { return E.weekdayEn(iso).slice(0, 3) + ' ' + E.fmtDate(iso); }
+  function initials(name) { return String(name || '?').replace(/<.*>/, '').trim().split(/\s+/).map(function (w) { return w.charAt(0); }).join('').slice(0, 2).toUpperCase() || '?'; }
+  function senderName(from) { var m = /^(.*?)\s*</.exec(from || ''); return m && m[1] ? m[1] : (from || '?'); }
+  function plural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
+  function clock() { S.clock += 2; var h = Math.floor(S.clock / 60), m = S.clock % 60; return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m; }
+  function fakeGuid() {
+    guidN++;
+    var a = (Math.imul(guidN, 2654435761) >>> 0).toString(16), b = (Math.imul(guidN + 97, 40503) >>> 0).toString(16);
+    a = ('00000000' + a).slice(-8); b = ('00000000' + b).slice(-8);
+    return a + '-' + b.slice(0, 4) + '-4' + b.slice(5, 8) + '-a' + a.slice(1, 4) + '-' + (b + a).slice(0, 12);
+  }
+
+  // ---------- state ----------
+
+  function freshSetup() {
+    return { name: '', city: '', state: '', user: '', prod: '', prodMap: null, cust: '', custMap: null, tol: 2, auto: 95, win: 14, bct: '', bce: 'Production', bcc: '', result: null };
+  }
+  function reset(keepView) {
+    T = {}; TIDS = []; guidN = 0;
+    clone(D.tenants).forEach(function (t) { T[t.id] = t; TIDS.push(t.id); });
+    var view = keepView && S ? S.view : 'inbox';
+    S = { t: TIDS[0], view: view, sel: {}, fixes: {}, sent: {}, asked: {}, bc: {}, log: [], hl: [], hlKey: -1, filter: 'all', pasteN: 0,
+      clock: 9 * 60 + 40, auto: {}, tipClosed: {}, costs: { orders: 2000, pages: 2, companies: 5, model: 'haiku' }, setup: freshSetup(), base: null, pasteFile: null };
+  }
+  function cur() { return T[S.t]; }
+  function run(tid) { tid = tid || S.t; return E.processInbox(T[tid], D.today, S.fixes[tid] || {}); }
+  function sentOf(tid, id) { return (S.sent[tid] || {})[id] || null; }
+  function stat(o) { return sentOf(S.t, o.id) ? 'sent' : o.status; }
+  function fixOf(id) { var a = S.fixes[S.t] = S.fixes[S.t] || {}; return (a[id] = a[id] || {}); }
+  function bcState(tid) {
+    if (S.bc[tid]) return S.bc[tid];
+    var hist = (T[tid].history || []).map(function (h) { return { id: fakeGuid(), number: h.id, ext: h.po, customer: h.customer, lines: h.lines.length, net: null, at: E.fmtDate(h.date), docId: null }; });
+    var top = hist.reduce(function (m, h) { var n = +(/(\d+)$/.exec(h.number) || [0, 0])[1]; return Math.max(m, n); }, 100000);
+    return (S.bc[tid] = { orders: hist, next: top + 1 });
+  }
+
+  // ---------- Business Central (simulated answers to the engine's real requests) ----------
+
+  function approve(o, quiet) {
+    var t = cur(), tid = S.t;
+    if (sentOf(tid, o.id) || o.status === 'blocked') return null;
+    if (!t.bc || !t.bc.tenantId || !t.bc.companyId) { toast('Business Central is not connected for ' + t.name + ' yet. Add the tenant and company ID first.'); return null; }
+    var reqs = E.bcRequests(o, t), bc = bcState(tid), ext = E.externalDocNo(o), at = clock();
+    var found = bc.orders.filter(function (x) { return x.ext === ext; })[0];
+    var res = [{ code: '200 OK', body: { token_type: 'Bearer', expires_in: 3599, access_token: '(hidden)' } }], entry;
+    if (found) {
+      res.push({ code: '200 OK', body: { value: [{ id: found.id, number: found.number }] } });
+      entry = { tid: tid, docId: o.id, at: at, existing: true, so: found.number, reqs: reqs, res: res,
+        result: 'Already in Business Central as ' + found.number + ' (external document number ' + ext + '). Nothing was created.' };
+    } else {
+      var id = fakeGuid(), number = 'SO-' + bc.next++;
+      res.push({ code: '200 OK', body: { value: [] } });
+      res.push({ code: '201 Created', body: { id: id, number: number, externalDocumentNumber: ext, customerNumber: o.customer.no, status: 'Draft', totalAmountExcludingTax: o.totals.net } });
+      o.lines.forEach(function (l, i) {
+        res.push({ code: '201 Created', body: { id: fakeGuid(), documentId: id, sequence: (i + 1) * 10000, lineType: 'Item', lineObjectNumber: l.item.no, quantity: l.qtyBase, unitPrice: l.unitPrice, netAmount: l.total } });
+      });
+      bc.orders.push({ id: id, number: number, ext: ext, customer: o.customer.no, lines: o.lines.length, net: o.totals.net, at: E.fmtDate(D.today) + ' ' + at, docId: o.id });
+      entry = { tid: tid, docId: o.id, at: at, existing: false, so: number, reqs: reqs, res: res,
+        result: 'Sales order ' + number + ' created with ' + plural(o.lines.length, 'line') + ', net ' + eur(o.totals.net) + '.' };
+    }
+    (S.sent[tid] = S.sent[tid] || {})[o.id] = { so: entry.so, at: at, existing: entry.existing };
+    S.log.unshift(entry);
+    if (!quiet) openDrawer(entry);
+    return entry.so;
+  }
+  function autoSend() {
+    if (!S.auto[S.t]) return;
+    var done = [];
+    run().forEach(function (o) { if (o.autoApprove && !sentOf(S.t, o.id)) { var so = approve(o, true); if (so) done.push(o.id + ' as ' + so); } });
+    if (done.length) toast('Sent automatically: ' + done.join(', '));
+  }
+  function logHtml(e) {
+    return '<p class="result ' + (e.existing ? 'warn' : 'ok') + '">' + esc(e.result) + '</p>' + e.reqs.map(function (r, i) {
+      var res = e.res[i], body = r.body ? (typeof r.body === 'string' ? r.body : JSON.stringify(r.body, null, 2)) : '';
+      return '<div class="req"><div class="req-step">' + (i + 1) + '. ' + esc(r.step) + '</div>' +
+        '<div class="req-line"><span class="meth ' + r.method + '">' + r.method + '</span> ' + esc(r.url) + '</div>' +
+        (body ? '<pre>' + esc(body) + '</pre>' : '') +
+        (res ? '<div class="resp"><span class="code">' + esc(res.code) + '</span><pre>' + esc(JSON.stringify(res.body, null, 2)) + '</pre></div>'
+          : '<div class="resp skipped">Not sent: the lookup above found the order, so nothing is created twice.</div>') + '</div>';
+    }).join('');
+  }
+  function openDrawer(e) {
+    $('drawer-t').textContent = e.docId + ' to Business Central · simulated sandbox';
+    $('drawer-b').innerHTML = logHtml(e);
+    $('drawer').hidden = false;
+  }
+
+  // ---------- rendering: shell ----------
+
+  function renderAll() {
+    var t = cur();
+    $('tenant').innerHTML = TIDS.map(function (id) { return '<option value="' + esc(id) + '"' + (id === S.t ? ' selected' : '') + '>' + esc(T[id].name) + '</option>'; }).join('');
+    $('user').innerHTML = '<span class="avatar">' + esc(initials(t.user)) + '</span><span>' + esc(t.user) + '</span>';
+    $('today').textContent = dateLong(D.today) + ' (demo date)';
+    var open = run().filter(function (o) { var s = stat(o); return s === 'review' || s === 'blocked'; }).length;
+    $('nav-n').textContent = open || '';
+    Array.prototype.forEach.call(document.querySelectorAll('nav a'), function (a) { a.classList.toggle('on', a.getAttribute('data-go') === S.view); });
+    VIEWS.forEach(function (v) { $('v-' + v).hidden = v !== S.view; });
+    ({ inbox: renderInbox, orders: renderOrders, products: renderProducts, customers: renderCustomers, rules: renderRules,
+      bc: renderBC, setup: renderSetup, costs: renderCosts, proposal: renderProposal })[S.view]();
+    document.body.setAttribute('data-view', S.view);
+  }
+  function go(v) {
+    if (VIEWS.indexOf(v) < 0) return;
+    S.view = v;
+    if (v === 'rules') S.base = snapshot();
+    renderAll();
+    $('main').scrollTop = 0;
+    try { history.replaceState(null, '', '#' + v); } catch (err) { /* file:// in some browsers */ }
+  }
+  function after() { autoSend(); renderAll(); }
+
+  // ---------- inbox ----------
+
+  var TIPS = {
+    brandt: 'Working prototype: an invented fastener wholesaler in Bielefeld and seven orders as they arrive by e-mail, PDF and Excel. Try to break it: open <a data-pick="M-1044">M-1044</a> and fix the typo, approve <a data-pick="M-1041">M-1041</a>, then release its forwarded copy <a data-pick="M-1045">M-1045</a> and approve that too, raise the price tolerance under <a data-go="rules">Rules</a>, <a data-act="paste-open">paste your own order</a>, or <a data-go="setup">add a company</a>.',
+    hofmann: 'A second company with its own data: Brandt\'s articles are unknown here. <a data-pick="H-201">H-201</a> orders by EAN code and crates, <a data-pick="H-202">H-202</a> breaks a minimum order, <a data-pick="H-203">H-203</a> asks for a date in the past and has no order number.',
+    other: 'This company starts empty. Click <a data-act="paste-open">New order</a>: the example uses its own customers and products.'
+  };
+  function kpi(label, v, cls) { return '<div class="kpi ' + (cls || '') + '"><div class="k">' + label + '</div><div class="v">' + v + '</div></div>'; }
+  function renderInbox() {
+    var t = cur(), os = run(), n = { all: os.length, ready: 0, review: 0, blocked: 0, sent: 0 }, readyVal = 0;
+    os.forEach(function (o) { var s = stat(o); n[s]++; if (s === 'ready') readyVal += o.totals.net; });
+    $('kpis').innerHTML = kpi('Received today', n.all) + kpi('Ready to send', n.ready, 'ok') + kpi('Needs review', n.review, 'warn') +
+      kpi('Blocked', n.blocked, 'err') + kpi('Sent to Business Central', n.sent, 'info') + kpi('Value ready to send', eur(E.round(readyVal, 2)));
+    var tip = TIPS[t.id] || TIPS.other;
+    $('tip').hidden = !!S.tipClosed[t.id];
+    $('tip').innerHTML = '<p>' + tip + '</p><button class="btn sm ghost" type="button" data-act="tip-close" aria-label="Hide tip">Hide</button>';
+    $('addr').textContent = t.inbox;
+    $('filters').innerHTML = ['all', 'ready', 'review', 'blocked', 'sent'].map(function (f) {
+      return '<button type="button" data-filter="' + f + '" class="' + (S.filter === f ? 'on' : '') + '">' + (f === 'all' ? 'All' : LABEL[f]) + ' ' + n[f] + '</button>';
+    }).join('');
+    var sel = S.sel[S.t];
+    if (!sel || !os.some(function (o) { return o.id === sel; })) sel = S.sel[S.t] = os.length ? os[0].id : null;
+    var shown = os.filter(function (o) { return S.filter === 'all' || stat(o) === S.filter; });
+    $('list').innerHTML = shown.map(listItem).join('') || '<li class="li empty">' + (os.length ? 'Nothing in this filter.' : 'No orders yet. Forward orders to ' + esc(t.inbox) + ' or click New order.') + '</li>';
+    var b = $('send-all'); b.textContent = 'Send all ready (' + n.ready + ')'; b.disabled = !n.ready;
+    var o = os.filter(function (x) { return x.id === sel; })[0];
+    renderDoc(o); renderDetail(o);
+  }
+  function badge(d) { return d.type === 'pdf' ? 'PDF' : d.type === 'excel' ? (/\.csv$/i.test(d.filename || '') ? 'CSV' : 'XLSX') : 'MAIL'; }
+  function listItem(o) {
+    var s = stat(o), d = o.doc, c = o.customer, asked = (S.asked[S.t] || {})[o.id];
+    var who = c ? esc(c.name) : '<i>Unknown sender · ' + esc(E.senderDomain(d.from) || 'no address') + '</i>';
+    var foot = '<span class="pill ' + s + '">' + LABEL[s] + '</span>';
+    if (o.lines.length) foot += '<span class="muted">' + plural(o.lines.length, 'line') + (s !== 'blocked' ? ' · ' + eur(o.totals.net) : '') + '</span>';
+    if (s === 'sent') foot += '<span class="chip">' + esc(sentOf(S.t, o.id).so) + '</span>';
+    if (asked && s !== 'sent') foot += '<span class="chip">Asked ' + esc(asked) + '</span>';
+    return '<li class="li st-' + s + (o.id === S.sel[S.t] ? ' on' : '') + '" data-pick="' + esc(o.id) + '" tabindex="0">' +
+      '<div class="li-top"><span class="li-id">' + esc(o.id) + '</span><span class="badge">' + badge(d) + '</span><span class="li-time">' + esc((d.received || '').slice(11)) + '</span></div>' +
+      '<div class="li-who">' + who + '</div><div class="li-subj">' + esc(d.subject || '(no subject)') + '</div><div class="li-foot">' + foot + '</div></li>';
+  }
+
+  // Highlight: the engine gives every field a pointer into the document ({part, i, a, b} or {part, r, c}).
+  function hlIndex(list) {
+    var H = {};
+    (list || []).forEach(function (s) {
+      if (!s) return;
+      var k = s.part === 'tcell' || s.part === 'cell' ? s.part + ':' + s.r + ':' + (s.c === undefined ? -1 : s.c) : s.i !== undefined ? s.part + ':' + s.i : s.part;
+      var e = H[k] || (H[k] = { marks: [] });
+      if (s.a !== undefined) e.marks.push([s.a, s.b]);
+    });
+    return H;
+  }
+  function hc(H, k) { return H[k] ? ' hl' : ''; }
+  function marked(t, H, k) {
+    var e = H[k];
+    if (!e || !e.marks.length) return esc(t);
+    var out = '', pos = 0;
+    e.marks.slice().sort(function (x, y) { return x[0] - y[0]; }).forEach(function (m) {
+      var a = Math.max(m[0], pos); if (m[1] <= a) return;
+      out += esc(t.slice(pos, a)) + '<mark>' + esc(t.slice(a, m[1])) + '</mark>'; pos = m[1];
+    });
+    return out + esc(t.slice(pos));
+  }
+  function colName(c) { var s = ''; c++; while (c > 0) { var m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - 1) / 26); } return s; }
+  function renderDoc(o) {
+    var el = $('doc');
+    if (!o) { el.innerHTML = '<div class="empty-state">The original e-mail, PDF or spreadsheet appears here.</div>'; return; }
+    var d = o.doc, H = hlIndex(S.hl), t = cur();
+    var kind = d.page ? 'E-mail with PDF attachment' : d.sheet ? 'E-mail with ' + badge(d) + ' attachment' : 'E-mail';
+    var h = '<div class="doc-bar"><b>Original</b><span class="muted">' + kind + '</span><span class="hint">Click a field or line on the right to see where it was read from.</span></div>';
+    h += '<div class="mail"><div class="mail-subj' + hc(H, 'subject') + '">' + marked(d.subject || '(no subject)', H, 'subject') + '</div>' +
+      '<div class="mail-meta"><span class="avatar sm">' + esc(initials(senderName(d.from))) + '</span><div><div class="' + hc(H, 'from') + '">' + marked(d.from || '(no sender)', H, 'from') + '</div>' +
+      '<div class="muted">to ' + esc(t.inbox) + ' · <span class="' + hc(H, 'received') + '">' + esc(d.received ? E.fmtDate(d.received.slice(0, 10)) + ' ' + d.received.slice(11) : '') + '</span></div></div></div>' +
+      '<div class="mail-body">' + (d.body || []).map(function (line, i) {
+        return '<div class="tl' + hc(H, 'body:' + i) + '">' + (line ? marked(line, H, 'body:' + i) : '&nbsp;') + '</div>';
+      }).join('') + '</div>';
+    if (d.page) h += renderPdf(d, H);
+    if (d.sheet) h += renderSheet(d, H);
+    el.innerHTML = h + '</div>';
+    var first = el.querySelector('.hl, mark');
+    if (first && el.scrollHeight > el.clientHeight + 4) {
+      var r = first.getBoundingClientRect(), p = el.getBoundingClientRect();
+      el.scrollTo({ top: el.scrollTop + (r.top - p.top) - el.clientHeight / 2 + r.height / 2, behavior: reduced ? 'auto' : 'smooth' });
+    }
+  }
+  function renderPdf(d, H) {
+    var p = d.page, tb = p.table;
+    var h = '<div class="att"><div class="att-bar"><span class="badge">PDF</span>' + esc(d.filename || 'Bestellung.pdf') + '<span class="muted">Page 1 of 1</span></div><div class="paper">';
+    h += (p.lines || []).map(function (line, i) {
+      return '<div class="pl' + (i === 0 ? ' pl-co' : '') + (/^BESTELLUNG$/i.test(line) ? ' pl-title' : '') + hc(H, 'page:' + i) + '">' + marked(line, H, 'page:' + i) + '</div>';
+    }).join('');
+    if (tb) {
+      h += '<table class="ptab"><thead><tr>' + tb.head.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        tb.rows.map(function (r, ri) {
+          return '<tr class="' + hc(H, 'tcell:' + ri + ':-1') + '">' + r.map(function (c, ci) {
+            return '<td class="' + (hc(H, 'tcell:' + ri + ':' + ci) + (/^[\d.,]+$/.test(c) ? ' r' : '')) + '">' + esc(c) + '</td>';
+          }).join('') + '</tr>';
+        }).join('') + '</tbody></table>';
+    }
+    h += (p.footer || []).map(function (line, i) { return '<div class="pf' + hc(H, 'footer:' + i) + '">' + marked(line, H, 'footer:' + i) + '</div>'; }).join('');
+    return h + '</div></div>';
+  }
+  function renderSheet(d, H) {
+    var rows = d.sheet, n = rows.reduce(function (m, r) { return Math.max(m, r.length); }, 0);
+    var h = '<div class="att"><div class="att-bar"><span class="badge">' + badge(d) + '</span>' + esc(d.filename || 'Bestellung.xlsx') + '<span class="muted">Sheet 1</span></div><div class="sheet-wrap"><table class="sheet"><thead><tr><th></th>';
+    for (var c = 0; c < n; c++) h += '<th>' + colName(c) + '</th>';
+    h += '</tr></thead><tbody>';
+    rows.forEach(function (r, ri) {
+      h += '<tr class="' + hc(H, 'cell:' + ri + ':-1') + '"><th>' + (ri + 1) + '</th>';
+      for (var k = 0; k < n; k++) {
+        var v = r[k] === undefined ? '' : String(r[k]);
+        h += '<td class="' + (hc(H, 'cell:' + ri + ':' + k) + (/^-?[\d.,]+$/.test(v) ? ' r' : '')) + '">' + esc(v) + '</td>';
+      }
+      h += '</tr>';
+    });
+    return h + '</tbody></table></div></div>';
+  }
+
+  function hlRef(list) { HLS.push(list.filter(Boolean)); return HLS.length - 1; }
+  var HOW = { 'article number': 'by article number', description: 'by description, please confirm', 'chosen by you': 'chosen by you' };
+  function howText(l) {
+    var h = l.how || '';
+    var txt = HOW[h] || (/^customer's own number/.test(h) ? 'by the ' + h : /^EAN/.test(h) ? 'by ' + h : h);
+    return esc(txt) + (l.item && l.conf ? ' · ' + pct(l.conf) : '');
+  }
+  function issueHtml(x, k, inline) {
+    var fx = x.fixes || [], btns = '';
+    if (fx.length > 3) {
+      btns = '<select class="inline-sel" data-ch="fixsel" data-k="' + k + '" aria-label="Choose"><option value="">Choose…</option>' +
+        fx.map(function (f, j) { return '<option value="' + j + '">' + esc(f.label) + '</option>'; }).join('') + '</select>';
+    } else {
+      btns = fx.map(function (f, j) { return '<button class="btn sm" type="button" data-act="fix" data-k="' + k + '" data-f="' + j + '">' + esc(f.label) + '</button>'; }).join('');
+    }
+    var msg = inline ? x.msg.replace(/^Line \d+: /, '') : x.msg;
+    return '<div class="issue ' + x.sev + '" data-code="' + x.code + '"><span class="ico">' + (x.sev === 'info' ? 'i' : '!') + '</span><div class="msg">' +
+      esc(msg.charAt(0).toUpperCase() + msg.slice(1)) + (btns ? '<div class="fixes">' + btns + '</div>' : '') + '</div></div>';
+  }
+  function renderDetail(o) {
+    var el = $('detail'), t = cur();
+    HLS = [];
+    if (!o) { el.innerHTML = '<div class="empty-state">What was read, what is wrong, and the buttons to fix it appear here.</div>'; return; }
+    var s = stat(o), sent = sentOf(S.t, o.id), locked = !!sent;
+    var errs = o.issues.filter(function (x) { return x.sev === 'error'; }).length, warns = o.issues.filter(function (x) { return x.sev === 'warning'; }).length;
+    var src = o.readBy === 'table' ? (o.doc.page ? 'Read from the PDF table' : 'Read from the spreadsheet') : 'Read from the e-mail text';
+    var h = '<div class="d-head"><div class="d-title"><span class="d-id">' + esc(o.id) + '</span><span class="pill ' + s + '" id="d-status">' + LABEL[s] + '</span>' +
+      (!locked ? '<span class="muted">Confidence ' + pct(o.confidence) + '</span>' : '') + '</div><div class="d-sub">' + src + ' · ' +
+      (errs ? plural(errs, 'problem') + ' to fix' : 'no blocking problems') + (warns ? ', ' + plural(warns, 'warning') : '') + '</div></div><div class="d-body">';
+    if (sent) {
+      h += '<div class="banner info">' + (sent.existing ? 'Already in Business Central as <b>' + esc(sent.so) + '</b>: the lookup found it, nothing was created twice.'
+        : 'Sales order <b>' + esc(sent.so) + '</b> created in Business Central at ' + esc(sent.at) + ' (simulated sandbox).') +
+        ' <button class="link" type="button" data-act="show-log" data-doc="' + esc(o.id) + '">Show the requests</button></div>';
+    }
+    var top = o.issues.map(function (x, k) { return [x, k]; }).filter(function (p) { return p[0].line === undefined; });
+    if (!locked && top.length) h += '<div class="issues">' + top.map(function (p) { return issueHtml(p[0], p[1], false); }).join('') + '</div>';
+
+    var hcu = o.header.customer, c = o.customer;
+    var custTd = c ? '<b>' + esc(c.name) + '</b> <span class="muted mono">' + esc(c.no) + '</span>' + (hcu ? '<div class="how">matched by ' + esc(hcu.how) + '</div>' : '') : '<span class="bad">Not found</span>';
+    if (!locked) {
+      custTd += '<div><select class="inline-sel" data-ch="customer" aria-label="Change customer"><option value="">' + (c ? 'Change customer…' : 'Choose customer…') + '</option>' +
+        t.customers.map(function (x) { return '<option value="' + esc(x.no) + '">' + esc(x.name + ' (' + x.no + ')') + '</option>'; }).join('') + '</select></div>';
+    }
+    var poV = o.po ? o.po.value : '';
+    var poTd = locked ? (poV ? '<span class="mono">' + esc(poV) + '</span>' : '<span class="muted">none</span>') :
+      '<input class="edit mono" data-ch="po" value="' + esc(poV) + '" placeholder="none, add one" aria-label="Customer order number">';
+    var dd = o.deliveryDate && o.deliveryDate.value, wk = dd ? E.isoWeek(dd) : null;
+    var ddTxt = dd ? E.fmtDate(dd) : '';
+    var ddTd = (locked ? (dd ? esc(ddTxt) : '<span class="muted">none</span>') : '<input class="edit" data-ch="date" value="' + esc(ddTxt) + '" placeholder="dd.mm.yyyy or KW 47" aria-label="Delivery date">') +
+      (dd ? ' <span class="how">' + E.weekdayEn(dd) + ', KW ' + wk.week + '</span>' : '');
+    var st = c && c.shipTo ? [c.shipTo.name, c.shipTo.line1, [c.shipTo.postCode, c.shipTo.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') : '';
+    h += '<h4>Order header</h4><table class="kv">' +
+      '<tr data-hl="' + hlRef([hcu && hcu.src]) + '"><th>Customer</th><td>' + custTd + '</td></tr>' +
+      '<tr data-hl="' + hlRef([o.po && o.po.src]) + '"><th>Customer order no.</th><td>' + poTd + (!o.po && !locked ? '<div class="how">Without one, ' + esc(E.externalDocNo(o)) + ' is used in Business Central.</div>' : '') + '</td></tr>' +
+      '<tr data-hl="' + hlRef([o.header.orderDate && o.header.orderDate.src]) + '"><th>Order date</th><td>' + (o.header.orderDate ? dateLong(o.header.orderDate.value) : '<span class="muted">not given</span>') + '</td></tr>' +
+      '<tr data-hl="' + hlRef([o.deliveryDate && o.deliveryDate.src]) + '"><th>Delivery date</th><td>' + ddTd + '</td></tr>' +
+      '<tr><th>Ship to</th><td>' + (st ? esc(st) : '<span class="muted">from the customer record</span>') + '</td></tr></table>';
+
+    h += '<h4>Lines</h4><div class="tbl"><table class="lines"><thead><tr><th></th><th>Article</th><th class="r">Quantity</th><th class="r">Price</th><th class="r">Total</th></tr></thead><tbody>';
+    o.lines.forEach(function (l, i) { h += lineRows(o, l, i, locked); });
+    var unmatched = o.lines.filter(function (l) { return !l.item; }).length;
+    h += '</tbody><tfoot><tr><td colspan="4" class="r">Net' + (unmatched ? ' (without ' + plural(unmatched, 'unmatched line') + ')' : '') + '</td><td class="r">' + eur(o.totals.net) + '</td></tr>' +
+      '<tr><td colspan="4" class="r">VAT ' + Math.round(t.vat * 100) + '%</td><td class="r">' + eur(o.totals.vat) + '</td></tr>' +
+      '<tr class="gross"><td colspan="4" class="r">Total</td><td class="r">' + eur(o.totals.gross) + '</td></tr></tfoot></table></div>';
+    if (!o.lines.length) h += '<p class="fine">No order lines were found in this message.</p>';
+
+    if (!locked) {
+      var mail = E.clarification(o, t);
+      var label = errs ? 'Fix ' + plural(errs, 'problem') + ' to send' : warns ? 'Approve with ' + plural(warns, 'warning') : 'Approve and create sales order';
+      h += '<div class="actions"><button class="btn primary" type="button" data-act="approve"' + (errs ? ' disabled' : '') + '>' + label + '</button>' +
+        '<button class="btn" type="button" data-act="ask"' + (mail ? '' : ' disabled title="Nothing to ask the customer"') + '>Draft Rückfrage</button>' +
+        (S.fixes[S.t] && S.fixes[S.t][o.id] ? '<button class="btn ghost" type="button" data-act="undo">Undo my changes</button>' : '') + '</div>';
+      if (o.status === 'ready') {
+        h += '<p class="fine">' + (o.autoApprove ? 'Clean and ' + pct(o.confidence) + ' sure. With auto-send on (Rules), an order like this goes straight to Business Central.'
+          : 'Clean, but ' + pct(o.confidence) + ' sure is under the auto-send line of ' + pct(t.settings.autoApproveMin) + ', so a person approves it.') + '</p>';
+      }
+    }
+    el.innerHTML = h + '</div>';
+    if (S.hlKey >= 0) { var on = el.querySelector('[data-hl="' + S.hlKey + '"]'); if (on) on.classList.add('on'); }
+  }
+  function lineRows(o, l, i, locked) {
+    var raw = l.raw, it = l.item, sev = l.issues.some(function (x) { return x.sev === 'error'; }) ? 'error' : l.issues.some(function (x) { return x.sev === 'warning'; }) ? 'warning' : '';
+    var ref = hlRef([raw.src, raw.codeSrc, raw.descSrc, raw.qtySrc, raw.priceSrc]);
+    var art = it ? '<b class="mono">' + esc(it.no) + '</b> ' + esc(it.desc) : '<span class="bad">' + esc(raw.code || raw.desc || '?') + '</span>' + (raw.code && raw.desc ? ' <span class="muted">' + esc(raw.desc) + '</span>' : '');
+    var ordered = (l.qtyOrdered !== null && l.qtyOrdered !== undefined ? E.fmtQty(l.qtyOrdered) : '?') + ' ' + esc(l.unitOrdered || raw.unitRaw || '');
+    var conv = it && l.qtyBase && (l.unitOrdered !== it.unit || l.qtyBase !== l.qtyOrdered);
+    var qty = it && l.qtyBase ? E.fmtQty(l.qtyBase) + ' ' + esc(it.unit) + (conv ? '<div class="how">ordered ' + ordered + '</div>' : '') : ordered;
+    var pr = it && l.unitPrice !== undefined ? price(l.unitPrice) + '<div class="how">' + esc(l.unitPrice === l.ordered && l.ordered !== l.agreed ? 'customer price accepted' : l.priceBasis) + '</div>' : '–';
+    var row = '<tr class="ln' + (sev ? ' sev-' + sev : '') + '" data-hl="' + ref + '"><td class="n">' + l.n + '</td><td>' + art + '<div class="how">' + (it ? howText(l) : 'not matched') + '</div></td>' +
+      '<td class="r">' + qty + '</td><td class="r">' + pr + '</td><td class="r">' + (it && l.total !== undefined ? eur(l.total) : '–') + '</td></tr>';
+    if (!locked && l.issues.length) {
+      var pick = l.issues.some(function (x) { return x.code === 'UNKNOWN_ITEM' || x.code === 'DESC_MATCH'; });
+      row += '<tr class="sub"><td></td><td colspan="4"><div class="issues" style="margin-top:0">' + l.issues.map(function (x) { return issueHtml(x, o.issues.indexOf(x), true); }).join('') + '</div>' +
+        (pick ? '<div style="margin-top:5px"><select class="inline-sel" data-ch="item" data-line="' + i + '" aria-label="Choose article for line ' + l.n + '"><option value="">Or pick from the product list…</option>' +
+          cur().items.map(function (x) { return '<option value="' + esc(x.no) + '">' + esc(x.no + '  ' + x.desc) + '</option>'; }).join('') + '</select></div>' : '') + '</td></tr>';
+    }
+    return row;
+  }
+
+  // ---------- other pages ----------
+
+  function renderOrders() {
+    var os = run();
+    $('orders-tbl').innerHTML = '<thead><tr><th>Intake</th><th>Received</th><th>Customer</th><th>Customer order no.</th><th>Delivery</th><th class="r">Lines</th><th class="r">Net</th><th>Status</th><th>Sales order</th></tr></thead><tbody>' +
+      (os.map(function (o) {
+        var s = stat(o), so = sentOf(S.t, o.id);
+        return '<tr class="click" data-open="' + esc(o.id) + '"><td class="mono">' + esc(o.id) + '</td><td>' + esc((o.doc.received || '').slice(11)) + '</td><td>' + (o.customer ? esc(o.customer.name) : '<i class="muted">unknown</i>') + '</td>' +
+          '<td class="mono">' + esc(o.po ? o.po.value : '') + '</td><td>' + (o.deliveryDate && o.deliveryDate.value ? E.fmtDate(o.deliveryDate.value) : '') + '</td><td class="r">' + o.lines.length + '</td>' +
+          '<td class="r">' + (s !== 'blocked' ? eur(o.totals.net) : '') + '</td><td><span class="pill ' + s + '">' + LABEL[s] + '</span></td><td class="mono">' + esc(so ? so.so : '') + '</td></tr>';
+      }).join('') || '<tr><td colspan="9" class="muted">No orders yet.</td></tr>') + '</tbody>';
+  }
+  function renderProducts() {
+    var t = cur(), q = ($('prod-q').value || '').trim().toLowerCase();
+    $('prod-lead').textContent = t.name + ': the product list every order is checked against, with pack sizes (so "20 KAR" becomes 2,000 pieces), minimum quantities and discontinued articles.';
+    var items = t.items.filter(function (x) { return !q || (x.no + ' ' + x.desc + ' ' + (x.ean || '')).toLowerCase().indexOf(q) >= 0; });
+    $('prod-n').textContent = items.length + ' of ' + plural(t.items.length, 'product');
+    $('prod-body').innerHTML = items.map(function (x) {
+      var packs = Object.keys(x.pack || {}).map(function (u) { return '1 ' + u + ' = ' + E.fmtQty(x.pack[u]) + ' ' + x.unit; }).join(', ');
+      var notes = [x.moq ? 'minimum ' + x.moq + ' ' + x.unit : '', x.discontinued ? 'discontinued' + (x.replacement ? ', successor ' + x.replacement : '') : ''].filter(Boolean).join('; ');
+      return '<tr><td class="mono"><b>' + esc(x.no) + '</b></td><td>' + esc(x.desc) + '</td><td>' + esc(x.unit) + '</td><td>' + esc(packs) + '</td><td class="r">' + price(x.price) + '</td><td class="mono">' + esc(x.ean || '') + '</td><td>' + (notes ? '<span class="' + (x.discontinued ? 'bad' : '') + '">' + esc(notes) + '</span>' : '') + '</td></tr>';
+    }).join('') || '<tr><td colspan="7" class="muted">No product matches.</td></tr>';
+  }
+  function renderCustomers() {
+    var t = cur();
+    $('cust-tbl').innerHTML = '<thead><tr><th>No.</th><th>Name</th><th>City</th><th>Orders from</th><th>VAT ID</th><th class="r">Discount</th><th>Special prices</th><th>Their own article numbers</th></tr></thead><tbody>' +
+      t.customers.map(function (c) {
+        var sp = Object.keys(c.prices || {}).map(function (k) { return k + ' at ' + price(c.prices[k]); }).join(', ');
+        var xr = Object.keys(c.xref || {}).map(function (k) { return k + ' = ' + c.xref[k]; }).join(', ');
+        return '<tr><td class="mono">' + esc(c.no) + '</td><td><b>' + esc(c.name) + '</b>' + (c.contact ? '<div class="how">' + esc(c.contact) + '</div>' : '') + '</td><td>' + esc(c.city || '') + '</td><td class="mono">' + esc((c.domains || []).map(function (d) { return '@' + d; }).join(', ')) + '</td>' +
+          '<td class="mono">' + esc(c.vat || '') + '</td><td class="r">' + (c.discount ? E.fmtNum(c.discount, 0) + '%' : '') + '</td><td>' + esc(sp) + '</td><td class="mono">' + esc(xr) + '</td></tr>';
+      }).join('') + '</tbody>';
+  }
+
+  var CODE_WORDS = { PRICE: 'price check', HOLIDAY: 'public holiday', WEEKEND: 'weekend', DUPLICATE: 'duplicate', MOQ: 'minimum quantity', PAST_DATE: 'date in the past', NO_DATE: 'missing date' };
+  function snapshot() { var m = {}; run().forEach(function (o) { m[o.id] = { s: stat(o), codes: o.issues.map(function (x) { return x.code; }) }; }); return m; }
+  function renderRules() {
+    var t = cur();
+    $('rules-lead').textContent = 'How strict the checks are for ' + t.name + '. Every company has its own rules, so you can tune them per subscriber.';
+    $('r-state').innerHTML = Object.keys(E.STATES).map(function (k) { return '<option value="' + k + '"' + (k === t.state ? ' selected' : '') + '>' + esc(E.STATES[k]) + '</option>'; }).join('');
+    $('r-tol').value = t.settings.priceTolerancePct; $('r-auto').value = Math.round(t.settings.autoApproveMin * 100); $('r-win').value = t.settings.duplicateWindowDays;
+    $('r-autosend').checked = !!S.auto[S.t];
+    $('r-err').innerHTML = ''; $('r-effect').hidden = true;
+    renderHolidays();
+  }
+  function renderHolidays() {
+    var t = cur(), y = +D.today.slice(0, 4), end = String(y + 1) + D.today.slice(4), all = [];
+    [y, y + 1].forEach(function (yy) { var h = E.holidays(yy, t.state); Object.keys(h).forEach(function (d) { if (d >= D.today && d < end) all.push([d, h[d]]); }); });
+    all.sort(function (a, b) { return a[0] < b[0] ? -1 : 1; });
+    $('hol-state').textContent = E.STATES[t.state] + ', next 12 months';
+    $('hol').innerHTML = all.map(function (x) { return '<li><span>' + dateLong(x[0]) + '</span><span>' + esc(x[1]) + '</span></li>'; }).join('');
+  }
+  function rulesChanged() {
+    var t = cur(), tol = Number($('r-tol').value), auto = Number($('r-auto').value), win = Number($('r-win').value), errs = [];
+    if ($('r-tol').value === '' || !(tol >= 0 && tol <= 50)) errs.push('Price tolerance must be between 0 and 50%.');
+    if ($('r-auto').value === '' || !(auto >= 50 && auto <= 100)) errs.push('Auto-send confidence must be between 50 and 100%.');
+    if ($('r-win').value === '' || !(win >= 1 && win <= 90) || Math.floor(win) !== win) errs.push('Duplicate window must be a whole number of days from 1 to 90.');
+    $('r-err').innerHTML = errs.length ? '<div class="errors">Not applied: <ul>' + errs.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></div>' : '';
+    if (errs.length) return;
+    t.state = $('r-state').value;
+    t.settings.priceTolerancePct = tol; t.settings.autoApproveMin = auto / 100; t.settings.duplicateWindowDays = win;
+    S.auto[S.t] = $('r-autosend').checked;
+    autoSend();
+    var now = snapshot(), base = S.base || now, changed = [];
+    Object.keys(now).forEach(function (id) {
+      var a = base[id], b = now[id]; if (!a) return;
+      var gone = a.codes.filter(function (c) { return b.codes.indexOf(c) < 0; }), added = b.codes.filter(function (c) { return a.codes.indexOf(c) < 0; });
+      if (a.s !== b.s || gone.length || added.length) {
+        changed.push('<b>' + esc(id) + '</b> ' + (a.s !== b.s ? LABEL[a.s] + ' → ' + LABEL[b.s] : LABEL[b.s]) +
+          (gone.length ? ' · no longer: ' + gone.map(function (c) { return CODE_WORDS[c] || c.toLowerCase(); }).join(', ') : '') +
+          (added.length ? ' · new: ' + added.map(function (c) { return CODE_WORDS[c] || c.toLowerCase(); }).join(', ') : ''));
+      }
+    });
+    var eff = $('r-effect');
+    eff.hidden = false;
+    eff.innerHTML = 'Re-checked ' + plural(Object.keys(now).length, 'order') + ': ' + (changed.length ? changed.length + ' changed since you opened this page.<br>' + changed.join('<br>') : 'nothing changed.');
+    renderHolidays();
+    var open = run().filter(function (o) { var s = stat(o); return s === 'review' || s === 'blocked'; }).length;
+    $('nav-n').textContent = open || '';
+  }
+  function renderBC() {
+    var t = cur(), bc = bcState(S.t);
+    $('bc-conn').innerHTML = '<div>Company</div><div>' + esc(t.name) + '</div>' +
+      '<div>Tenant ID</div><div class="mono">' + esc(t.bc.tenantId || 'not connected') + '</div>' +
+      '<div>Environment</div><div>' + esc(t.bc.environment || '') + '</div>' +
+      '<div>Company ID</div><div class="mono">' + esc(t.bc.companyId || 'not connected') + '</div>' +
+      '<div>Sign-in</div><div>Service to service: an app registration in their Microsoft Entra ID with only the Business Central permissions it needs. The secret sits in a vault, never in this page.</div>' +
+      '<div>API</div><div>Business Central API v2.0: <span class="mono">salesOrders</span>, then <span class="mono">salesOrderLines</span></div>';
+    $('bc-orders').innerHTML = '<thead><tr><th>Number</th><th>External document no.</th><th>Customer</th><th class="r">Lines</th><th class="r">Net</th><th>Created</th><th>From</th></tr></thead><tbody>' +
+      (bc.orders.slice().reverse().map(function (x) {
+        return '<tr><td class="mono"><b>' + esc(x.number) + '</b></td><td class="mono">' + esc(x.ext) + '</td><td class="mono">' + esc(x.customer) + '</td><td class="r">' + x.lines + '</td><td class="r">' + (x.net !== null ? eur(x.net) : '') + '</td><td>' + esc(x.at) + '</td><td class="mono">' + esc(x.docId || 'earlier') + '</td></tr>';
+      }).join('') || '<tr><td colspan="7" class="muted">None yet.</td></tr>') + '</tbody>';
+    var logs = S.log.filter(function (e) { return e.tid === S.t; });
+    $('bc-log').innerHTML = logs.length ? logs.map(function (e, i) {
+      return '<details class="logi"' + (i === 0 ? ' open' : '') + '><summary>' + esc(e.at) + ' · ' + esc(e.docId) + ' → ' + (e.existing ? 'found ' + esc(e.so) + ', nothing created' : esc(e.so) + ' created') + ' · ' + plural(e.existing ? 2 : e.reqs.length, 'request') + '</summary><div class="inner">' + logHtml(e) + '</div></details>';
+    }).join('') : '<p class="muted">Approve an order in the inbox and its requests appear here.</p>';
+  }
+
+  // ---------- add a company ----------
+
+  var PROD_FIELDS = [['itemNo', 'Article no.'], ['desc', 'Description'], ['unit', 'Unit'], ['price', 'Price']];
+  var CUST_FIELDS = [['no', 'Customer no.'], ['name', 'Name'], ['email', 'E-mail'], ['vat', 'VAT ID'], ['discount', 'Discount'], ['city', 'City']];
+  function mapSelects(kind, fields, res) {
+    return '<div class="map">' + fields.map(function (f) {
+      var c = res.map[f[0]];
+      return '<label>' + f[1] + '<select data-map="' + kind + '" data-f="' + f[0] + '"><option value="-1">(none)</option>' +
+        res.headers.map(function (h, i) { return '<option value="' + i + '"' + (c === i ? ' selected' : '') + '>' + esc(h || colName(i)) + '</option>'; }).join('') + '</select></label>';
+    }).join('') + '</div>';
+  }
+  function problems(list, cls, title) {
+    return list.length ? '<div class="' + cls + '">' + title + '<ul>' + list.map(function (x) { return '<li>Row ' + x.row + ': ' + esc(x.reason) + '</li>'; }).join('') + '</ul></div>' : '';
+  }
+  function renderSetupProd() {
+    var su = S.setup, out = $('su-prod-out');
+    if (!su.prod.trim()) { out.innerHTML = ''; return null; }
+    var r = E.importCatalog(su.prod, su.prodMap);
+    out.innerHTML = '<p class="fine">Columns found (separator "' + (r.delimiter === '\t' ? 'tab' : r.delimiter) + '"). Change them if a column was guessed wrong:</p>' + mapSelects('prod', PROD_FIELDS, r) +
+      (r.missing.length ? '<div class="errors">Still missing: ' + r.missing.map(function (f) { return PROD_FIELDS.filter(function (x) { return x[0] === f; })[0][1]; }).join(', ') + '</div>' : '') +
+      '<p class="okline" id="su-prod-n">' + plural(r.items.length, 'product') + ' ready' + (r.skipped.length ? ', ' + plural(r.skipped.length, 'row') + ' skipped' : '') + '</p>' +
+      problems(r.skipped, 'warns', 'Skipped, with the reason:') +
+      (r.items.length ? '<div class="tbl"><table class="grid"><thead><tr><th>Article</th><th>Description</th><th>Unit</th><th class="r">Price</th></tr></thead><tbody>' +
+        r.items.slice(0, 5).map(function (x) { return '<tr><td class="mono">' + esc(x.no) + '</td><td>' + esc(x.desc) + '</td><td>' + esc(x.unit) + '</td><td class="r">' + price(x.price) + '</td></tr>'; }).join('') +
+        (r.items.length > 5 ? '<tr><td colspan="4" class="muted">and ' + (r.items.length - 5) + ' more</td></tr>' : '') + '</tbody></table></div>' : '');
+    return r;
+  }
+  function renderSetupCust() {
+    var su = S.setup, out = $('su-cust-out');
+    if (!su.cust.trim()) { out.innerHTML = ''; return null; }
+    var r = E.importCustomers(su.cust, su.custMap);
+    out.innerHTML = '<p class="fine">Columns found:</p>' + mapSelects('cust', CUST_FIELDS, r) +
+      (r.missing.length ? '<div class="errors">Still missing: ' + r.missing.map(function (f) { return CUST_FIELDS.filter(function (x) { return x[0] === f; })[0][1]; }).join(', ') + '</div>' : '') +
+      '<p class="okline" id="su-cust-n">' + plural(r.customers.length, 'customer') + ' ready' + (r.skipped.length ? ', ' + plural(r.skipped.length, 'row') + ' skipped' : '') + (r.warnings.length ? ', ' + plural(r.warnings.length, 'value') + ' dropped' : '') + '</p>' +
+      problems(r.skipped, 'warns', 'Skipped, with the reason:') + problems(r.warnings, 'warns', 'Kept the customer, dropped a value:') +
+      (r.customers.length ? '<div class="tbl"><table class="grid"><thead><tr><th>No.</th><th>Name</th><th>Orders from</th><th>VAT ID</th><th class="r">Discount</th></tr></thead><tbody>' +
+        r.customers.slice(0, 5).map(function (c) { return '<tr><td class="mono">' + esc(c.no) + '</td><td>' + esc(c.name) + '</td><td class="mono">' + esc(c.domains.map(function (d) { return '@' + d; }).join(', ')) + '</td><td class="mono">' + esc(c.vat || '') + '</td><td class="r">' + (c.discount ? c.discount + '%' : '') + '</td></tr>'; }).join('') + '</tbody></table></div>' : '');
+    return r;
+  }
+  function renderSetup() {
+    var su = S.setup;
+    $('su-state').innerHTML = '<option value="">Choose…</option>' + Object.keys(E.STATES).map(function (k) { return '<option value="' + k + '"' + (k === su.state ? ' selected' : '') + '>' + esc(E.STATES[k]) + '</option>'; }).join('');
+    [['su-name', 'name'], ['su-city', 'city'], ['su-user', 'user'], ['su-prod', 'prod'], ['su-cust', 'cust'], ['su-tol', 'tol'], ['su-auto', 'auto'], ['su-win', 'win'], ['su-bct', 'bct'], ['su-bce', 'bce'], ['su-bcc', 'bcc']]
+      .forEach(function (p) { $(p[0]).value = su[p[1]]; });
+    renderSetupProd(); renderSetupCust();
+    $('su-msg').innerHTML = '';
+  }
+  function createCompany() {
+    var su = S.setup;
+    var pr = su.prod.trim() ? E.importCatalog(su.prod, su.prodMap) : { items: [] }, cr = su.cust.trim() ? E.importCustomers(su.cust, su.custMap) : { customers: [] };
+    var r = E.newTenant({ name: su.name, city: su.city, state: su.state, user: su.user, priceTolerancePct: su.tol === '' ? NaN : Number(su.tol), autoApprovePct: su.auto === '' ? NaN : Number(su.auto),
+      duplicateWindowDays: su.win === '' ? NaN : Number(su.win), bcTenantId: su.bct, bcEnvironment: su.bce, bcCompanyId: su.bcc }, pr.items, cr.customers);
+    if (r.errors.length) {
+      $('su-msg').innerHTML = '<div class="errors" id="su-errors"><b>Not created yet.</b> Please fix:<ul>' + r.errors.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></div>';
+      $('su-msg').scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    var nt = r.tenant, id = nt.id, k = 2;
+    while (T[id]) id = nt.id + '-' + k++;
+    nt.id = id; T[id] = nt; TIDS.push(id); S.t = id; S.setup = freshSetup(); S.filter = 'all';
+    toast(nt.name + ' created: ' + plural(nt.items.length, 'product') + ', ' + plural(nt.customers.length, 'customer') + '. Its inbox is empty, so paste an order.' + (r.warnings.length ? ' Note: ' + r.warnings[0] : ''));
+    go('inbox');
+  }
+
+  // ---------- running costs ----------
+
+  function renderCosts() {
+    var c = S.costs;
+    $('c-orders').value = c.orders; $('c-pages').value = c.pages; $('c-comp').value = c.companies;
+    $('c-model').innerHTML = Object.keys(D.costs.models).map(function (k) { return '<option value="' + k + '"' + (k === c.model ? ' selected' : '') + '>' + esc(D.costs.models[k].name) + '</option>'; }).join('');
+    $('care').innerHTML = '<thead><tr><th>Plan</th><th class="r">Per month</th><th>Fix response</th><th class="r">Change hours</th><th>Report</th></tr></thead><tbody>' +
+      '<tr><td><b>Essential</b></td><td class="r">$350</td><td>within 2 business days</td><td class="r">1</td><td>monthly one-page health report</td></tr>' +
+      '<tr><td><b>Standard</b></td><td class="r">$600</td><td>next business day</td><td class="r">3</td><td>monthly report with numbers, weekly failure review</td></tr>' +
+      '<tr><td><b>Priority</b></td><td class="r">$1,200</td><td>same business day</td><td class="r">6</td><td>monthly report and a quarterly roadmap call (3 months minimum)</td></tr></tbody>';
+    costsChanged();
+  }
+  function costsChanged() {
+    var c = S.costs;
+    c.orders = $('c-orders').value === '' ? NaN : Number($('c-orders').value);
+    c.pages = $('c-pages').value === '' ? NaN : Number($('c-pages').value);
+    c.companies = $('c-comp').value === '' ? NaN : Number($('c-comp').value);
+    c.model = $('c-model').value || c.model;
+    var r = E.monthlyCost(c, D.costs);
+    $('c-err').innerHTML = r.errors.length ? '<div class="errors">Not calculated: <ul>' + r.errors.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></div>' : '';
+    if (r.errors.length) return;
+    var m = D.costs.models[c.model];
+    $('c-out').innerHTML = '<table class="grid"><tbody>' +
+      '<tr><td>AI reading (' + esc(r.model) + ')<div class="how">' + usd(r.perOrder, 4) + ' an order: about ' + E.fmtNum(D.costs.tokensPerPage * c.pages + D.costs.baseTokens, 0).replace(/\./g, ',') + ' tokens in at $' + m.in + ' and ' + E.fmtNum(D.costs.outTokens, 0).replace(/\./g, ',') + ' out at $' + m.out + ' per million</div></td><td class="r">' + usd(r.llm) + '</td></tr>' +
+      '<tr><td>EU hosting<div class="how">app server, database, backups and document storage in Germany: $' + D.costs.hostingBase + ' plus $' + D.costs.hostingPerCompany + ' per company</div></td><td class="r">' + usd(r.hosting) + '</td></tr>' +
+      '<tr><td>E-mail<div class="how">inbound order addresses and Rückfrage e-mails</div></td><td class="r">' + usd(r.email) + '</td></tr>' +
+      '<tr><td>Monitoring<div class="how">uptime checks, error alerts and logs</div></td><td class="r">' + usd(r.monitoring) + '</td></tr>' +
+      '<tr><td><b>Total a month</b></td><td class="r" id="c-total"><b>' + usd(r.total) + '</b></td></tr>' +
+      '<tr><td>Per customer company</td><td class="r" id="c-per">' + usd(r.perCompany) + '</td></tr></tbody></table>' +
+      '<p class="fine">Estimates from list prices. Anthropic model prices from its published price list; hosting assumes a German data centre. Your real numbers come from the first month of the pilot.</p>';
+  }
+
+  // ---------- proposal ----------
+
+  function renderProposal() {
+    var P = E.pricing(D.pricing, D.pricing.rate), rate = P.rate;
+    var c5 = E.monthlyCost({ orders: 2000, pages: 2, companies: 5, model: 'haiku' }, D.costs), son = E.monthlyCost({ orders: 2000, pages: 2, companies: 5, model: 'sonnet' }, D.costs);
+    var mvpW = Math.round(P.mvp.hours / 30), fullW = Math.round(P.totalHours / 30);
+    var value = P.total + 750 + 600;
+    var h = '<h1>Your order-processing SaaS: price, time and running costs</h1>' +
+      '<p class="lead">Everything in the menu on the left is a working prototype of the platform you described. This page answers the five questions in your post. Prices at ' + usd(rate, 0) + ' an hour, billed on Upwork with each milestone as a checkpoint you approve.</p>' +
+      '<h4>Your five questions</h4><div class="qa">' +
+      qa('How much would a basic working MVP cost?', usd(P.mvp.amount, 0), 'About ' + P.mvp.hours + ' hours. One customer company live end to end: orders arrive by e-mail, PDF or Excel, are read and checked, staff approve them, and the sales order appears in Business Central.') +
+      qa('How much would a complete, production-ready SaaS version cost?', usd(P.total, 0) + ' in total', 'The MVP plus about ' + P.full.hours + ' hours: self-serve onboarding and subscriptions, security and data protection, scale and reliability, and a learning loop.') +
+      qa('How long would development take?', 'About ' + mvpW + ' weeks to the MVP', 'About ' + Math.round(fullW / 4.3) + ' months to the production version, at roughly 30 hours a week. Each milestone ends with something you can click, like this page.') +
+      qa('What would the monthly operating and maintenance costs be?', 'About ' + usd(c5.total, 0) + ' a month', 'For 5 companies and 2,000 orders: EU hosting, e-mail, monitoring and AI reading (' + usd(c5.llm) + ' on ' + esc(c5.model) + ', or ' + usd(son.llm, 0) + ' on ' + esc(son.model) + ' for hard scans). Maintenance is optional, from $350 a month. <a data-go="costs">Change the numbers</a>.') +
+      qa('Have you worked on similar AI automation or Business Central projects?', 'Automation yes, Business Central not yet', 'I built an order management system with 19 n8n workflows and 1,237 automated test assertions, a WooCommerce to Xero accounting integration that is still on a support retainer, and an AI sales agent that answers leads by SMS and e-mail. Business Central would be new as a client project, so milestone 1 proves the connection on your sandbox before anything else, and this prototype already builds the exact API v2.0 requests (see Business Central).') +
+      '</div>';
+
+    h += '<h4>Three ways to start</h4><div class="tiers">' +
+      '<div class="tier"><h3>MVP</h3><div class="price">' + usd(P.mvp.amount, 0) + '</div><div class="per">about ' + P.mvp.hours + ' hours · about ' + mvpW + ' weeks</div><ul>' +
+        '<li>Each company gets its own login, data and order address</li><li>E-mails, PDFs and Excel files read into fields</li><li>Checks: products, customers, units, prices, dates, holidays, duplicates</li><li>Review screen with fix buttons and German Rückfrage drafts</li><li>Sales orders in Business Central, never twice</li><li>Pilot week with one real company; code and accounts in your name</li></ul></div>' +
+      '<div class="tier feat"><span class="tag">Best value</span><h3>Production SaaS</h3><div class="price">' + usd(P.total, 0) + '</div><div class="per">about ' + P.totalHours + ' hours · about ' + Math.round(fullW / 4.3) + ' months</div><ul>' +
+        '<li>Everything in the MVP</li><li>Self-serve onboarding, like Add a company</li><li>Subscriptions and invoices (Stripe, German VAT)</li><li>Microsoft sign-in, roles and an audit log</li><li>AV contract (Art. 28 GDPR) and TOMs for your customers</li><li>Queues, retries, alerts and scanned PDFs</li><li>Corrections teach each customer\'s article numbers</li></ul>' +
+        '<div class="stack"><div><span>Build</span><span>' + usd(P.total, 0) + '</span></div><div><span>Discovery and specification (this prototype)</span><span>$750 included</span></div><div><span>30 days of fixes after launch</span><span>$600 included</span></div><div><span>Your first two companies set up with you</span><span>included</span></div>' +
+        '<div><b>Value</b><span><s>' + usd(value, 0) + '</s> <b>' + usd(P.total, 0) + '</b></span></div></div></div>' +
+      '<div class="tier"><h3>Care, after launch</h3><div class="price">from $350</div><div class="per">a month, month to month</div><ul>' +
+        '<li>Monitoring and error alerts</li><li>Fixes when Business Central, Microsoft sign-in or the AI model changes</li><li>Change hours each month for small requests</li><li>A one-page monthly report</li><li>Standard $600, Priority $1,200 (see Running costs)</li></ul></div></div>';
+
+    h += '<h4>Milestones</h4><div class="card"><div class="tbl"><table class="grid"><thead><tr><th>#</th><th>Milestone</th><th class="r">Hours</th><th class="r">Price</th><th>Done when</th></tr></thead><tbody>' +
+      P.mvp.milestones.concat(P.full.milestones).map(function (m, i) {
+        return (i === P.mvp.milestones.length ? '<tr><td colspan="5" class="muted" style="background:#fafbfc">Production version</td></tr>' : '') +
+          '<tr><td>' + (i + 1) + '</td><td><b>' + esc(m.name) + '</b></td><td class="r">' + m.hours + '</td><td class="r">' + usd(m.amount, 0) + '</td><td>' + esc(m.done) + '</td></tr>';
+      }).join('') + '<tr><td></td><td><b>Total</b></td><td class="r"><b>' + P.totalHours + '</b></td><td class="r"><b>' + usd(P.total, 0) + '</b></td><td class="muted">MVP alone: ' + usd(P.mvp.amount, 0) + ' (milestones 1 to 4)</td></tr></tbody></table></div></div>';
+
+    h += '<h4>How it works</h4><div class="steps">' +
+      '<div class="step"><div class="n">1</div>A customer e-mails an order (text, PDF or Excel) to their supplier\'s order address.</div>' +
+      '<div class="step"><div class="n">2</div>It is read into fields and checked against that supplier\'s products, customers, prices, units and calendar.</div>' +
+      '<div class="step theirs"><div class="n">3 · their staff</div>Staff fix what is flagged and approve. Clean orders can go straight through.</div>' +
+      '<div class="step"><div class="n">4</div>The sales order appears in Business Central, once, with every line.</div></div>';
+
+    h += '<h4>Security and data protection for German business customers</h4><div class="sec">' +
+      '<div>Hosting and document storage in Germany, encrypted at rest and in transit.</div>' +
+      '<div>Every company\'s data is separated in the database and encrypted with its own key.</div>' +
+      '<div>AV contract (Art. 28 GDPR), TOMs and a subprocessor list you hand to your customers.</div>' +
+      '<div>The AI step runs in an EU region under a data processing agreement; documents are not used for training.</div>' +
+      '<div>Microsoft sign-in (Entra ID), roles, and an audit log of every change and approval.</div>' +
+      '<div>Originals deleted after a period each company sets; export and deletion on request.</div></div>';
+
+    h += '<h4>Under the hood</h4><div class="two"><div class="tree">order-desk-1101/\n  index.html              this page, no framework\n  src/orderEngine.js      reading, checks, Business Central\n  data/sample.json        invented sample data\n  tests/verify.js         node checks, same engine\n  tests/browser-check.py  clicks through this page</div>' +
+      '<div style="font-size:13px"><p style="margin-top:0">The page and the tests load the same engine file, so what you click is what is tested: <b>' + esc(TESTS) + '</b>.</p>' +
+      '<p>In this prototype the reading step is rule-based (German order formats), so it runs in your browser with no key. In the product an AI model fills the same fields through a strict schema, and everything after reading is this engine.</p>' +
+      '<p>Hand <span class="mono">src/</span> and <span class="mono">tests/</span> to your developer, or never open them. You own all of it from the first commit.</p></div></div>';
+
+    h += '<div class="cta"><h2>Send me 10 real orders and one product list</h2><p>E-mails, PDFs or Excel files, anonymised if you like, plus the product and customer export from one company. I will load them into this prototype and show you your own orders checked before you pay anything.</p><p>Reply on Upwork. The first milestone can start as soon as a Business Central sandbox is available.</p></div>';
+
+    h += '<h4>What I need from you to start</h4><ol class="need"><li>20 to 50 real orders from one pilot company.</li><li>A Business Central sandbox and someone who can register an app in Entra ID (I send a short guide).</li><li>Product and customer exports (CSV or Excel) from that company.</li><li>Your choice of hosting account in your name; I set it up with you.</li></ol>';
+
+    h += '<div class="scope"><p><b>Honest scope.</b> Built from your Upwork post. All companies, people, article numbers, VAT IDs and orders are invented; no real client data is shown. The engine and its passing tests are real. Reading here is rule-based; the product uses an AI model for it. Business Central requests are built but not sent: a simulated sandbox answers them. I have not delivered a Business Central project for a client before. This link will be taken down about 30 days after it was sent.</p><p>Built by Taiwo, Pathfinder Automation Solutions.</p></div>';
+    $('v-proposal').innerHTML = h;
+  }
+  function qa(q, big, text) { return '<div class="card"><div class="q">' + esc(q) + '</div><div class="a"><div class="big">' + big + '</div>' + text + '</div></div>'; }
+
+  // ---------- modal: new order, Rückfrage ----------
+
+  function openModal(html) { $('modal').innerHTML = html; $('scrim').hidden = false; var f = $('modal').querySelector('input,textarea,button'); if (f) f.focus(); }
+  function closeModal() { $('scrim').hidden = true; $('modal').innerHTML = ''; S.pasteFile = null; }
+  function pasteForm() {
+    openModal('<div class="modal-h"><b>New order for ' + esc(cur().name) + '</b><button class="btn sm ghost" type="button" data-act="modal-close">Close</button></div><div class="modal-b">' +
+      '<p class="fine" style="margin-top:0">Paste an order e-mail (German or English), or upload a CSV export of an Excel order. It goes through the same engine as the samples.</p>' +
+      '<label for="p-from">From</label><input id="p-from" placeholder="Name &lt;einkauf@customer.de&gt;" autocomplete="off">' +
+      '<label for="p-subj">Subject</label><input id="p-subj" placeholder="Bestellung 4500012345" autocomplete="off">' +
+      '<label for="p-body">Order text</label><textarea id="p-body" spellcheck="false" placeholder="20 KAR 100-820 Sechskantschraube M8x20&#10;Liefertermin: KW 46"></textarea>' +
+      '<label for="p-file">Or a CSV file</label><input id="p-file" type="file" accept=".csv,.txt"><div id="p-file-n" class="fine"></div><div id="p-err"></div></div>' +
+      '<div class="modal-f"><button class="btn" type="button" data-act="paste-example">Insert an example</button><span class="sp"></span><button class="btn ghost" type="button" data-act="modal-close">Cancel</button><button class="btn primary" type="button" data-act="paste-submit">Read and check</button></div>');
+  }
+  function exampleOrder() {
+    var t = cur(), ex = D.examples.orders[t.id];
+    if (ex) return ex;
+    var c = t.customers.filter(function (x) { return x.domains && x.domains.length; })[0], d = D.today;
+    for (var i = 0; i < 5; i++) d = E.nextWorkday(d, t.state);
+    var UNIT = { STK: 'Stk', M: 'm', KAR: 'KAR', VE: 'VE', PAAR: 'Paar', KI: 'Kisten', FL: 'Fl', KG: 'kg', ROL: 'Rollen', PAK: 'Pakete', L: 'Liter', PAL: 'Pal' };
+    var lines = t.items.slice(0, 3).map(function (it, k) { return [50, 20, 10][k] + ' ' + (UNIT[it.unit] || 'Stk') + ' ' + it.no + ' ' + it.desc; });
+    return { from: c ? 'Einkauf <einkauf@' + c.domains[0] + '>' : 'Einkauf <einkauf@beispiel-kunde.de>', subject: 'Bestellung ' + (4711 + S.pasteN),
+      body: ['Guten Tag,', '', 'bitte liefern Sie bis ' + E.fmtDate(d) + ':', ''].concat(lines).concat(['', 'Danke und Gruß', c ? c.name : 'Ihr Kunde']).join('\n') };
+  }
+  function pasteSubmit() {
+    var from = $('p-from').value.trim(), subj = $('p-subj').value.trim(), body = $('p-body').value, f = S.pasteFile, errs = [];
+    if (from && !/@[^\s@>]+\.[^\s@>]+/.test(from)) errs.push('The sender must contain an e-mail address, or stay empty.');
+    if (!f && !body.trim()) errs.push('Paste the order text or choose a CSV file.');
+    if (body.length > 20000) errs.push('That text is too long for one order (over 20,000 characters).');
+    if (f && f.rows.length < 2) errs.push('The CSV file has no rows under its header.');
+    if (errs.length) { $('p-err').innerHTML = '<div class="errors" id="p-errors">' + errs.map(esc).join('<br>') + '</div>'; return; }
+    var t = cur(), id = 'P-' + (++S.pasteN), doc = { id: id, type: f ? 'excel' : 'email', from: from, subject: subj, received: D.today + ' ' + clock(), body: body.replace(/\r\n?/g, '\n').split('\n') };
+    if (f) { doc.sheet = f.rows; doc.filename = f.name; if (!body.trim()) doc.body = ['(order attached as ' + f.name + ')']; }
+    t.docs.push(doc);
+    closeModal();
+    S.sel[S.t] = id; S.hl = []; S.hlKey = -1; S.filter = 'all';
+    var o = run().filter(function (x) { return x.id === id; })[0];
+    toast(id + ' read: ' + plural(o.lines.length, 'line') + ', ' + LABEL[o.status].toLowerCase() + (o.issues.length ? ' (' + o.issues.map(function (x) { return x.code.toLowerCase().replace(/_/g, ' '); }).join(', ') + ')' : '') + '.');
+    if (S.view !== 'inbox') go('inbox'); else after();
+  }
+  function askForm(o) {
+    var t = cur(), m = E.clarification(o, t);
+    if (!m) return;
+    openModal('<div class="modal-h"><b>Rückfrage for ' + esc(o.id) + '</b><button class="btn sm ghost" type="button" data-act="modal-close">Close</button></div><div class="modal-b">' +
+      '<label>To</label><input value="' + esc(o.doc.from || '') + '" readonly>' +
+      '<label for="m-subj">Subject</label><input id="m-subj" value="' + esc(m.subject) + '">' +
+      '<label for="m-body">Message (German, from the order\'s own problems)</label><textarea id="m-body" style="min-height:260px">' + esc(m.body) + '</textarea>' +
+      '<p class="fine">In the product this goes out from the shared order mailbox and the customer\'s answer lands back on this order. Here nothing is sent.</p></div>' +
+      '<div class="modal-f"><button class="btn" type="button" data-act="copy-mail">Copy text</button><span class="sp"></span><button class="btn primary" type="button" data-act="mark-asked" data-doc="' + esc(o.id) + '">Mark as asked</button></div>');
+  }
+
+  // ---------- events ----------
+
+  var toastTimer = null;
+  function toast(msg) { var t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.hidden = true; }, 4200); }
+  function selected() { var id = S.sel[S.t]; return run().filter(function (o) { return o.id === id; })[0] || null; }
+  function pick(id) { S.sel[S.t] = id; S.hl = []; S.hlKey = -1; if (S.filter !== 'all') S.filter = 'all'; if (S.view !== 'inbox') go('inbox'); else renderAll(); }
+
+  document.addEventListener('click', function (ev) {
+    var el = ev.target.closest('[data-go],[data-pick],[data-act],[data-filter],[data-hl],[data-open]');
+    if (!el) { return; }
+    if (el.hasAttribute('data-go')) { ev.preventDefault(); go(el.getAttribute('data-go')); return; }
+    if (el.hasAttribute('data-pick')) { ev.preventDefault(); pick(el.getAttribute('data-pick')); return; }
+    if (el.hasAttribute('data-open')) { pick(el.getAttribute('data-open')); return; }
+    if (el.hasAttribute('data-filter')) { S.filter = el.getAttribute('data-filter'); renderAll(); return; }
+    if (el.hasAttribute('data-hl') && !el.hasAttribute('data-act')) {
+      if (ev.target.closest('button,a')) return;
+      var k = +el.getAttribute('data-hl');
+      S.hl = HLS[k] || []; S.hlKey = k;
+      Array.prototype.forEach.call(document.querySelectorAll('#detail [data-hl].on'), function (x) { x.classList.remove('on'); });
+      el.classList.add('on');
+      renderDoc(selected());
+      if (!S.hl.length) toast('This value was not read from the document (chosen by you or from the customer record).');
+      return;
+    }
+    var act = el.getAttribute('data-act'), o;
+    switch (act) {
+      case 'fix': {
+        o = selected(); if (!o) return;
+        var x = o.issues[+el.getAttribute('data-k')], f = x && x.fixes && x.fixes[+el.getAttribute('data-f')];
+        if (f) applyFix(o, x, f);
+        return;
+      }
+      case 'approve': o = selected(); if (o) { approve(o); renderAll(); } return;
+      case 'send-all': {
+        var done = [];
+        run().forEach(function (q) { if (stat(q) === 'ready') { var so = approve(q, true); if (so) done.push(so); } });
+        if (done.length) toast(plural(done.length, 'sales order') + ' created: ' + done.join(', ') + '.');
+        renderAll(); return;
+      }
+      case 'ask': o = selected(); if (o) askForm(o); return;
+      case 'undo': o = selected(); if (o && S.fixes[S.t]) { delete S.fixes[S.t][o.id]; after(); } return;
+      case 'show-log': {
+        var e = S.log.filter(function (l) { return l.tid === S.t && l.docId === el.getAttribute('data-doc'); })[0];
+        if (e) openDrawer(e); return;
+      }
+      case 'drawer-close': $('drawer').hidden = true; return;
+      case 'tip-close': S.tipClosed[S.t] = true; $('tip').hidden = true; return;
+      case 'paste-open': pasteForm(); return;
+      case 'paste-example': { var ex = exampleOrder(); $('p-from').value = ex.from; $('p-subj').value = ex.subject; $('p-body').value = ex.body; return; }
+      case 'paste-submit': pasteSubmit(); return;
+      case 'modal-close': closeModal(); return;
+      case 'copy-mail': {
+        var txt = 'Betreff: ' + $('m-subj').value + '\n\n' + $('m-body').value;
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(function () { toast('Copied.'); }, function () { $('m-body').select(); toast('Select and copy the text with Ctrl+C.'); });
+        else { $('m-body').select(); toast('Select and copy the text with Ctrl+C.'); }
+        return;
+      }
+      case 'mark-asked': { (S.asked[S.t] = S.asked[S.t] || {})[el.getAttribute('data-doc')] = clock(); closeModal(); toast('Marked as asked. The order waits for the customer\'s answer.'); renderAll(); return; }
+      case 'reset-demo': reset(true); closeModal(); $('drawer').hidden = true; renderAll(); toast('Demo reset to the original sample data.'); return;
+      case 'su-example': {
+        var X = D.examples, co = X.company;
+        S.setup = freshSetup();
+        S.setup.name = co.name; S.setup.city = co.city; S.setup.state = co.state; S.setup.user = co.user; S.setup.tol = co.priceTolerancePct; S.setup.auto = co.autoApprovePct;
+        S.setup.win = co.duplicateWindowDays; S.setup.bct = co.bcTenantId; S.setup.bce = co.bcEnvironment; S.setup.bcc = co.bcCompanyId; S.setup.prod = X.products; S.setup.cust = X.customers;
+        renderSetup(); return;
+      }
+      case 'su-create': createCompany(); return;
+    }
+  });
+  function applyFix(o, x, f) {
+    var fx = fixOf(o.id);
+    if (f.set) Object.keys(f.set).forEach(function (k) { fx[k] = f.set[k]; });
+    if (f.setLine) { fx.lines = fx.lines || {}; var L = fx.lines[x.line] = fx.lines[x.line] || {}; Object.keys(f.setLine).forEach(function (k) { L[k] = f.setLine[k]; }); }
+    S.hl = []; S.hlKey = -1;
+    after();
+  }
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape') { if (!$('scrim').hidden) closeModal(); else $('drawer').hidden = true; }
+    if (ev.key === 'Enter' && ev.target.hasAttribute && ev.target.hasAttribute('data-pick')) pick(ev.target.getAttribute('data-pick'));
+  });
+  document.addEventListener('change', function (ev) {
+    var el = ev.target, ch = el.getAttribute('data-ch'), o;
+    if (el.id === 'tenant') { S.t = el.value; S.hl = []; S.hlKey = -1; S.filter = 'all'; if (S.view === 'rules') S.base = snapshot(); renderAll(); return; }
+    if (ch) {
+      o = selected(); if (!o) return;
+      if (ch === 'customer' && el.value) { fixOf(o.id).customer = el.value; after(); }
+      else if (ch === 'fixsel' && el.value !== '') { var x = o.issues[+el.getAttribute('data-k')]; if (x && x.fixes[+el.value]) applyFix(o, x, x.fixes[+el.value]); }
+      else if (ch === 'item' && el.value) { var fx = fixOf(o.id); fx.lines = fx.lines || {}; (fx.lines[+el.getAttribute('data-line')] = fx.lines[+el.getAttribute('data-line')] || {}).itemNo = el.value; after(); }
+      else if (ch === 'po') { var v = el.value.trim(); if (v.length > 35) { el.classList.add('invalid'); toast('Business Central allows 35 characters for the order number.'); return; } fixOf(o.id).po = v || null; after(); }
+      else if (ch === 'date') {
+        var d = E.parseDate(el.value.trim(), D.today);
+        if (!d) { el.classList.add('invalid'); toast('"' + el.value + '" is not a date. Use 13.11.2026 or KW 47.'); return; }
+        fixOf(o.id).deliveryDate = d; after();
+      }
+      return;
+    }
+    if (el.hasAttribute('data-map')) {
+      var kind = el.getAttribute('data-map'), fields = kind === 'prod' ? PROD_FIELDS : CUST_FIELDS, m = {};
+      Array.prototype.forEach.call(document.querySelectorAll('[data-map="' + kind + '"]'), function (s) { m[s.getAttribute('data-f')] = +s.value; });
+      S.setup[kind + 'Map'] = m;
+      if (kind === 'prod') renderSetupProd(); else renderSetupCust();
+      return;
+    }
+    if (el.id === 'su-prod-file' || el.id === 'su-cust-file' || el.id === 'p-file') {
+      var file = el.files && el.files[0]; if (!file) return;
+      var rd = new FileReader();
+      rd.onload = function () {
+        var text = String(rd.result || '');
+        if (el.id === 'p-file') { S.pasteFile = { name: file.name, rows: E.parseCSV(text).rows }; $('p-file-n').textContent = file.name + ': ' + plural(Math.max(0, S.pasteFile.rows.length), 'row') + ' read.'; return; }
+        var key = el.id === 'su-prod-file' ? 'prod' : 'cust';
+        S.setup[key] = text; S.setup[key + 'Map'] = null; $('su-' + key).value = text;
+        if (key === 'prod') renderSetupProd(); else renderSetupCust();
+      };
+      rd.readAsText(file);
+      return;
+    }
+    if (el.id === 'r-state' || el.id === 'r-autosend') { rulesChanged(); return; }
+    if (el.id === 'c-model') { costsChanged(); return; }
+    if (el.id === 'su-state') { S.setup.state = el.value; return; }
+  });
+  document.addEventListener('input', function (ev) {
+    var el = ev.target;
+    if (el.id === 'prod-q') { renderProducts(); return; }
+    if (/^r-(tol|auto|win)$/.test(el.id)) { rulesChanged(); return; }
+    if (/^c-(orders|pages|comp)$/.test(el.id)) { costsChanged(); return; }
+    var k = el.getAttribute('data-su');
+    if (k) {
+      S.setup[k] = el.value;
+      if (k === 'prod') { S.setup.prodMap = null; renderSetupProd(); }
+      if (k === 'cust') { S.setup.custMap = null; renderSetupCust(); }
+    }
+    if (el.classList.contains('invalid')) el.classList.remove('invalid');
+  });
+
+  // ---------- start ----------
+
+  function start(data) {
+    D = data; reset(false);
+    var h = (location.hash || '').slice(1);
+    if (VIEWS.indexOf(h) >= 0) S.view = h;
+    renderAll();
+    document.body.setAttribute('data-ready', '1');
+  }
+  if (location.protocol === 'file:') start(FALLBACK);
+  else fetch('data/sample.json', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(start, function () { start(FALLBACK); });
+})();
+</script>
+</body>
+</html>

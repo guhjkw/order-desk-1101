@@ -1,0 +1,78 @@
+1. Numbers, money and dates
+PASS 1.1 German and English number formats
+PASS 1.2 commercial rounding: 5 x 3,705 = 18,53
+PASS 1.3 money in German format
+PASS 1.4 KW 46/2026 starts Monday 9 Nov
+PASS 1.5 dates: 06.11. takes this year, 31.02. is refused
+PASS 1.6 Easter 2026 is 5 April; Fronleichnam 4 June in NW
+PASS 1.7 holidays differ by state (6 Jan only in BY)
+PASS 1.8 next workday after Christmas Day 2026 is Mon 28 Dec
+2. Reading the sample orders
+PASS 2.1 plain email: 3 lines, cartons converted to pieces
+PASS 2.2 customer found by sender address, order number from the subject
+PASS 2.3 "KW 46" becomes 9 Nov; order is ready with no issues
+PASS 2.4 agreed price with 5% customer discount, net 322,53 €
+PASS 2.5 PDF table read; customer found by "Kunden-Nr. bei Ihnen"
+PASS 2.6 Excel: header row found below the title rows; 2 Karton gloves = 24 pairs
+PASS 2.7 customer's own article numbers mapped (MM-SR820 -> 100-820)
+PASS 2.8 EAN codes and "Kisten" read for the drinks wholesaler
+3. Checks
+PASS 3.1 Christmas Day delivery is flagged with the holiday name
+PASS 3.2 price 3,10 € vs agreed 3,40 € flagged (-8,8%)
+PASS 3.3 stated total matches its own lines: no TOTAL warning
+PASS 3.4 discontinued item blocks, successor offered
+PASS 3.5 minimum order quantity flagged (6 of 12)
+PASS 3.6 typo 100-280 suggests 100-820 first ("two characters swapped")
+PASS 3.7 lines without article numbers matched by description (M8 nut, 6,0 drill)
+PASS 3.8 forwarded copy is a duplicate of the first email
+PASS 3.9 unknown sender and unknown VAT ID: customer not found
+PASS 3.10 Saturday delivery flagged; past delivery date blocks
+PASS 3.11 missing order number is a warning, not a block
+4. Fixes from the review screen
+PASS 4.1 choosing the suggestion clears the block
+PASS 4.2 successor + round up + date: Holtkamp order becomes ready, 12 cartridges
+PASS 4.3 accepting the customer price uses 3,10 € and the net becomes 531,00 €
+PASS 4.4 "not a duplicate" releases the forwarded copy
+5. Business Central
+PASS 5.1 sign-in, duplicate lookup, header, then one request per line
+PASS 5.2 lookup filters on externalDocumentNumber before creating
+PASS 5.3 header uses Business Central field names
+PASS 5.4 lines: lineType Item, lineObjectNumber, quantity in base unit
+PASS 5.5 no secret in any request
+6. Clarification email
+PASS 6.1 German draft asks about the discontinued item, the minimum and the date
+PASS 6.2 nothing to ask on a clean order
+7. Onboarding import
+PASS 7.1 semicolon CSV with German headers and decimals is mapped
+PASS 7.2 bad rows are skipped with a reason
+PASS 7.3 an imported list is used right away (A-2 found)
+PASS 7.4 companies are separate: Brandt articles are unknown at Hofmann
+8. Costs and price
+PASS 8.1 Haiku 5.5: 5,500 tokens in + 1,000 out = 0,105 cent per order, 2,10 $ for 2,000 orders
+PASS 8.2 total = model + hosting + email + monitoring
+PASS 8.3 MVP 180 hours, full product 396 hours
+PASS 8.4 price follows the rate: 180 h x 35 $ = 6,300 $
+9. Bad input
+PASS 9.1 a message with no order is reported, not crashed on
+PASS 9.2 a unit the item is not sold in is refused with a reason
+10. Added for onboarding and the calendar
+PASS 10.1 all 16 states: Reformationstag in NI not NW, Buß- und Bettag 18 Nov only in SN, Frauentag in BE
+PASS 10.2 calendar weeks: 9 Nov = KW 46, 31 Dec 2026 = KW 53, 4 Jan 2027 = KW 1
+PASS 10.3 "KW 53/2027" is refused (2027 has 52 weeks); "KW 53/2026" is 28 Dec
+PASS 10.4 no customer order number: intake id OD-H-203 is the external document number and the lookup key
+PASS 10.5 column choice on screen overrides the automatic one (VK-Preis -> EK-Preis)
+PASS 10.6 customer list: e-mail becomes the matching domain, VAT ID cleaned, discount read
+PASS 10.7 customer list: bad VAT ID and discount dropped with warnings, 3 bad rows skipped with reasons
+PASS 10.8 add-company form refuses bad input with one reason each
+PASS 10.9 valid form creates the company (Lower Saxony calendar, own inbox, BC not yet connected warning)
+PASS 10.10 the new company works at once: customer by e-mail, metres read, its prices less 3%, and its own holiday (Reformationstag 31 Oct in NI)
+PASS 10.11 cost calculator refuses 0 orders and 2.5 pages with reasons
+PASS 10.12 cost per company: 5 companies share 127,10 $ = 25,42 $ each
+11. The examples the page offers
+PASS 11.1 example product list: 9 products, 2 rows skipped (no number; price "auf Anfrage")
+PASS 11.2 example customer list: 4 customers, 2 warnings (VAT ID, discount), 1 row skipped (no name)
+PASS 11.3 example company is valid and connected to Business Central
+PASS 11.4 Brandt example: Kruse found, 4 lines, blocked because pallets are not a unit of 410-650
+PASS 11.5 Hofmann example: Friday 13 Nov read, crates to bottles, cheese matched by description for review
+
+65 passed, 0 failed

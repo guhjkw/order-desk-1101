@@ -1,0 +1,61 @@
+1. Inbox
+PASS 1.1 loads the engine and the sample data over http
+PASS 1.2 Brandt inbox: 7 received, 2 ready, 1 to review, 4 blocked, 0 sent
+PASS 1.3 first order opens: M-1041 from Meier is ready, 3 lines, net 322,53 €
+PASS 1.4 clicking line 1 highlights where it was read in the e-mail
+2. Approve and Business Central
+PASS 2.1 approve shows the real requests: sign-in, lookup by order number, header, 3 lines
+PASS 2.2 the order is now Sent and the sent counter is 1
+3. Fixing a blocked order
+PASS 3.1 M-1044 is blocked by an unknown article
+PASS 3.2 the first suggestion is 100-820 because two characters are swapped
+PASS 3.3 the typo is marked in the original e-mail
+PASS 3.4 choosing the suggestion changes Blocked to Needs review
+PASS 3.5 confirming the two description matches makes it Ready
+PASS 3.6 approving creates the next sales order, SO-104819
+4. Duplicates and never twice
+PASS 4.1 the forwarded copy is blocked as a duplicate of M-1041
+PASS 4.2 releasing it makes it Ready
+PASS 4.3 Business Central lookup finds SO-104818 and creates nothing
+5. Rückfrage and editing fields
+PASS 5.1 Excel order: line 2 highlights its row in the sheet
+PASS 5.2 the German Rückfrage asks about the discontinued item, the minimum and the date
+PASS 5.3 marking it as asked shows on the inbox list
+PASS 5.4 a delivery date that is not a date is refused with a reason
+PASS 5.5 typing KW 47 sets Monday 16.11.2026 and clears the missing-date warning
+6. Rules
+PASS 6.1 raising the price tolerance to 10% removes M-1042's price warning at once
+PASS 6.2 an 80% tolerance is refused with a reason
+PASS 6.3 switching to Saxony lists Buß- und Bettag on 18.11.2026
+7. Paste your own order
+PASS 7.1 an empty order is refused with a reason
+PASS 7.2 a sender without an e-mail address is refused
+PASS 7.3 the pasted Kruse order is read: 4 lines, blocked because pallets are not a unit of 410-650
+8. Add a company
+PASS 8.1 example product list: 9 ready, 2 rows skipped with reasons
+PASS 8.2 example customers: 4 ready, 1 skipped, 2 values dropped
+PASS 8.3 choosing the EK-Preis column changes the imported price to 0,52 €
+PASS 8.4 a missing name and a malformed tenant ID are refused with reasons
+PASS 8.5 the company is created and selected, with an empty inbox
+PASS 8.6 its first order: customer found from its own list, metres read, Ready
+PASS 8.7 it sends to its own Business Central numbering (SO-100001)
+9. Second company, master data, Business Central page
+PASS 9.1 Hofmann has its own 3 orders
+PASS 9.2 H-201: EAN codes read, cheese matched by description for review
+PASS 9.3 product search narrows 13 products to the 2 in M10
+PASS 9.4 Business Central page lists SO-104817 (earlier), SO-104818 and SO-104819, nothing twice
+10. Running costs and proposal
+PASS 10.1 default running cost: $127.10 a month, $25.42 per company
+PASS 10.2 10,000 orders a month: $135.50
+PASS 10.3 zero orders is refused with a reason
+PASS 10.4 proposal answers with the engine's numbers: MVP $6,300, full $13,860, tests 65 passed
+PASS 10.5 eight milestones, each with a done-when line
+11. Reset, phone width, console
+PASS 11.1 Reset demo restores 7 orders, 0 sent and two companies
+PASS 11.2 PDF order: the delivery date row highlights 25.12.2026 on the PDF page
+PASS 11.3 at phone width nothing scrolls sideways (inbox and proposal)
+PASS 11.4 no console or page errors
+12. Opened off disk
+PASS 12.1 file:// uses the embedded data: 7 orders, no errors
+
+47 passed, 0 failed
