@@ -48,7 +48,7 @@ PASS 9.4 Business Central page lists SO-104817 (earlier), SO-104818 and SO-10481
 PASS 10.1 default running cost: $127.10 a month, $25.42 per company
 PASS 10.2 10,000 orders a month: $135.50
 PASS 10.3 zero orders is refused with a reason
-PASS 10.4 proposal answers with the engine's numbers: MVP $6,300, full $13,860, tests 65 passed
+PASS 10.4 proposal answers with the engine's numbers at $25/hr: MVP $4,500, full $9,900, tests 65 passed
 PASS 10.5 eight milestones, each with a done-when line
 11. Reset, phone width, console
 PASS 11.1 Reset demo restores 7 orders, 0 sent and two companies

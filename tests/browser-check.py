@@ -217,8 +217,8 @@ try:
         page.fill("#c-orders", "2000")
         page.click("nav [data-go='proposal']")
         prop = page.inner_text("#v-proposal")
-        ok("10.4 proposal answers with the engine's numbers: MVP $6,300, full $13,860, tests 65 passed",
-           "$6,300" in prop and "$13,860" in prop and "65 node checks passed, 0 failed" in prop, prop[:200])
+        ok("10.4 proposal answers with the engine's numbers at $25/hr: MVP $4,500, full $9,900, tests 65 passed",
+           "$25 an hour" in prop and "$4,500" in prop and "$9,900" in prop and "$11,250" in prop and "$13,860" not in prop and "65 node checks passed, 0 failed" in prop, prop[:200])
         ok("10.5 eight milestones, each with a done-when line", page.locator("#v-proposal table.grid tbody tr").count() == 10)
         page.set_viewport_size({"width": 1440, "height": 3600})
         page.screenshot(path=str(SHOTS / "5-proposal.png"))

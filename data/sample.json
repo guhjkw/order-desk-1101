@@ -2,7 +2,7 @@
  "_note": "Invented sample data: both companies, all customers, people, article numbers, VAT IDs and orders are made up for this demo.",
  "today": "2026-11-02",
  "pricing": {
-  "rate": 35,
+  "rate": 25,
   "mvp": [
    {
     "name": "Foundation and order intake",
